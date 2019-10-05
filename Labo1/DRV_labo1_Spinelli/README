@@ -1,0 +1,60 @@
+# 2.6 Accès aux périphériques du CycloneV-Soc depuis U-Boot
+
+**Pour tester tous ces excercices, il faut que les switches derières la carte soit dans cette position: 010100**
+
+## Ex1
+La différence entre les commandes montrés, sont la lecutre d'un b=byte / w=mot(16bits) / l=mot(32bits). Sinon, si on lis plusieurs de ces valeurs, il lis et affiche du LSB au MSB.
+
+Afin de tester l'exercice il suffit de taper la 1er commande, regarder la valeur affichée et de taper la 2eme commande avec la valeur observée.
+
+
+1) md.w 0xff200040 0x1
+
+ff200040: {VAL}    ..
+
+2) mw.w 0xff200000 {VAL}
+
+## Ex2
+Pour tester cette exercice, il faut commencer par créer l'image du script avec cette commande : **mkimage -T script -C none -n 'Ex2 script' -d script_Ex2 script_Ex2.img**
+
+Ensuite, il faut le placer dans le dossier /var/lib/tftpboot/ (**cp script_Ex2.img /var/lib/tftpboot/**).
+
+Après, depuis U-Boot, récupérer l'image et la placer à l'adresse souhaitée (ex: **tftp 0xf000 script_Ex2.img**).
+
+Finalement, il faut lancer le script avec la commande source (**source 0xf000**)
+
+Voici mon script pour l'ex 2 :
+
+echo ***INITIALES--EX-2***
+
+while true ; do
+	mw.l 0xff200020 0x866d866d
+	mw.w 0xff200030 0x866D
+	sleep 1
+	mw.l 0xff200020 0x00000000
+	mw.w 0xff200030 0x0000
+	sleep 1
+; done
+
+S'il n'apparait pas de facon claire, il est aussi disponible dans l'archive rendue.
+
+
+# 2.7 accès périphériques du DE1-Soc depuis Linux
+
+Le problème avec l'approche de maper avec le fichier /dev/mem est qu'il y a aucune sécurité. Il est donc possible de lire et ecrire n'importe où dans la memoire.
+
+
+Afin de tester les exercices suivants, il faut commencer par les compiler pour la cible. (**arm-linux-gnueabihf-gcc Ex3.c -o Ex3**).
+
+Ensuite, il faut palcer l'image dans le dossier /export/drv/ pour qu'il soit directement accessible depuis la machine. (**sudo cp Ex3 /export/drv/**)
+
+Finalement, il suffit d'aller dans le dossier drv de la cible (**/home/root/drv**) et d'executer le programme (ex **./Ex3**)
+
+## Ex3
+voir le code Ex3.c
+
+## Ex4
+voir le code Ex4.c
+
+le soucis principale de l'exercice 4 est que le logiciel a le temps de détecter plusieurs fois l'appui du bouton avec qu'on ait le temps de relever le doigt. De plus, il peut y avoir des rebonds.
+Afin de résoudre le problème, j'ai ajouté un boolean qui permet de savoir si l'appuie a déjà été détecté.

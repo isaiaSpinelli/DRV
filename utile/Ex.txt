@@ -28,3 +28,14 @@ typedef volatile unsigned short vushort;
 #define FPGA_BUTEE_MAX          *(vushort *)(FPGA_USER_BASE_ADDR + 0xC)
 #define FPGA_DESACTIV_FLAG      *(vushort *)(FPGA_USER_BASE_ADDR + 0xE)
 #define FPGA_FLAG_DETEC_BUTEE   *(vushort *)(FPGA_USER_BASE_ADDR + 0xE)
+
+
+https://www.kernel.org/doc/html/latest/process/coding-style.html
+
+f you need to calculate the length of an array, take advantage of the macro
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+if you need to calculate the size of some structure member, use
+#define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
+
+

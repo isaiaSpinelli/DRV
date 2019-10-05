@@ -1,10 +1,34 @@
+SEL : 010100
+
 picocom -b 115200 /dev/ttyUSB0 (picoDE1)
+
+u-boot -> reboot -> u-boot
 
 # transforme du texte en script pour u-boot
 mkimage -T script -C none -n 'Ex2 script' -d script_Ex2 script_Ex2.img
 
-# place le script au chemain a l'addresse
+cp script_Ex2.img /var/lib/tftpboot/
+
+# place le script au chemain a l'addresse (0xf000 )
 tftp addr chemin
+tftp 0xf000 script_Ex2.img
 
 # lance le fichier a l'addresse
 source addr
+source 0xf000
+
+
+## Linux
+/export/drv
+
+arm-linux-gnueabihf-gcc Ex3.c -o Ex3
+
+
+sudo cp Ex3 /export/drv/
+
+(DE1) ./Ex3
+
+## rendu
+
+tar -czvf file.tar.gz directory
+
