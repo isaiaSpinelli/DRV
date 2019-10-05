@@ -1,0 +1,10 @@
+picocom -b 115200 /dev/ttyUSB0 (picoDE1)
+
+# transforme du texte en script pour u-boot
+mkimage -T script -C none -n 'Ex2 script' -d script_Ex2 script_Ex2.img
+
+# place le script au chemain a l'addresse
+tftp addr chemin
+
+# lance le fichier a l'addresse
+source addr

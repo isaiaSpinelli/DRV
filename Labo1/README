@@ -1,0 +1,10 @@
+Ex1 :
+md.w 0xff200040 0x1
+mw.w 0xff200000 {val_lu}
+
+Ex2 :
+mw.w 0xff200020 0x866D (allume "IS")
+sleep 1 (attend 1 seconde)
+mw.w 0xff200020 0x0000 (eteint tout)
+sleep 1
+mw.w 0xff200020 0x866D

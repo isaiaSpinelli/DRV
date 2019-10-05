@@ -1,0 +1,9 @@
+while true ; do
+	echo goo
+	mw.w 0xff200020 0x0000
+	sleep 1
+	mw.w 0xff200020 0x866D
+	sleep 1 
+; done
+
+
