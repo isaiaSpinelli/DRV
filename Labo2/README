@@ -2,6 +2,9 @@
 Spinelli isaia
 09.10.19
 
+lien : http://reds-calculator.einet.ad.eivd.ch/drv_2019/
+
+
 ## Téléchargement du noyau Linux et ajout des modules pour le User-space I/O
 
 Commandes :
@@ -42,3 +45,22 @@ On indique l'adresse du registre et sa taille ainsi que les numéros d'interrupt
 Avertissement : le nom du répertoire source dans la dernière commande pourrait changer!! (ajout de sudo)
 
 Ces commandes permettent de compiler le noyau, les modules et le device tree. Ensuite, copie les anciens fichiers pour les sauvgarder et place le nouveau noyau et dtb dans le dossier /var/lib/tftpboot/ afin de les deployer sur la carte. Finalement, place les modules précèdemment compilés dans /export/drv/.
+
+Finalement, après avoir boot sur la carte :
+cd /lib/modules
+rm * -rf
+mv /home/root/drv/4.14.130-ltsi-13527-g567dd6b26fcf-dirty/ .
+
+après redemarrage, verifier que les drivers user-space soient disponible en modules avec :
+**zcat /proc/config.gz | grep UIO**
+
+## Exercice 1
+
+Afin de rechercher et analyser rapidement dans les configurations, j'utilise **cat .config | grep -n ""** pour avoir les ligne qui m'interesse et ensuite j'ouvre le .config avec **less** et avec la commande **{line}g** je saute directement à la ligne souhaitée. **/search**->Search forward  **?search**->Search backward
+
+Exemple pour "CPU power management":
+![image](/img/search_cpu.png)
+**less .config**
+:**612g**
+
+## Exercice 2
