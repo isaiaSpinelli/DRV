@@ -14,7 +14,9 @@ Commandes :
 **git checkout socfpga-4.14.130-ltsi**
 configuration :
 **make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- socfpga_defconfig**
-architecure: arm tool chain : arm-linux-gnueabihf	board : socfpga_defconfig
+architecure: arm
+tool chain : arm-linux-gnueabihf
+board : socfpga_defconfig
 Cela permet de compiler le noyau avec toutes les configurations correspendontes à notre matériel.
 
 **grep UIO .config** permet de savoir si les userspace drivers sont actifs.
@@ -28,13 +30,13 @@ Compilation avec **modification de la configuration.**
 exit and save
 
 
-Il faut ensuite **modifier le device tree** pour qu’on puisse gérer les boutons avec le UIO driver. (save l'ancoen .dts)
+Il faut ensuite **modifier le device tree** pour qu’on puisse gérer les boutons avec le UIO driver. (save l'ancien .dts)
 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts-> ajouter :
 drv-btn {
-        compatible = "drv-btn";
-        reg = <0xFF200000 0x1000>;
-        interrupts = <0 41 1>;
-        interrupt-parent = <&intc>;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;compatible = "drv-btn";
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reg = <0xFF200000 0x1000>;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interrupts = <0 41 1>;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interrupt-parent = <&intc>;
 };
 
 On indique l'adresse du registre et sa taille ainsi que les numéros d'interruptions.
@@ -51,7 +53,7 @@ cd /lib/modules
 rm * -rf
 mv /home/root/drv/4.14.130-ltsi-13527-g567dd6b26fcf-dirty/ .
 
-après redemarrage, verifier que les drivers user-space soient disponible en modules avec :
+après redemarrage, il faut verifier que les drivers user-space soient disponible en modules avec :
 **zcat /proc/config.gz | grep UIO**
 
 ## Exercice 1
@@ -63,4 +65,63 @@ Exemple pour "CPU power management":
 **less .config**
 :**612g**
 
+- configurations général
+- IRQ
+- Timers
+- CPU/Task time
+- RCU
+- Performance du noyau
+- GCOV based kernel profiling (outil d'analyse de couverture de code )
+- type de partitions
+- Ordonnacneurs
+- Bus
+- Boot options
+- CPU Power management
+- Network
+- CAN
+- Device Drivers
+- GPIO
+- Block layer
+- Kernel hacking (printk/dmwesg/compiler/debug )
+- Hardware I/O
+- WathDog
+- DMA
+- Clock
+- ADC
+- Sensors
+- File system
+- Securité
+
 ## Exercice 2
+Il a fallu écrire un logiciel user-space qui affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3. Ce logiciel est en annexe au nom de Ex2.c.
+
+Afin de tester le fonctionnement du programme, il faut commencer par le compiler avec la toolchain suivante :arm-linux-gnueabihf-gcc. Ensuite, il faut placer l'executable sur la carte (via /export/drv) puis l'executer avec "./".
+
+Je pense que la différence avec l'utilisation de mmap() et des UIO permet de limiter l'accès à la memoire grâce à la descprition faite dans la dts. De plus, je crois qu'il y a la possibilité de recevoir des interruptions.
+
+
+## Exercice 3
+
+### drivers user-space
+
+#### Avantages
+Rapide car moins de commutations de contexte utilisateur-noyau.
+Pas de plantage du système.
+Accès à pleins de bibliothèques donc surement plus simple à coder.
+Facilement déboguer avec des outils
+
+#### Désavantages
+Presque tous sont basés sur du polling.
+Fait sens seulement quand tous les clients sont dans l'espace utilisateur.
+
+En bref je dirais qu'il faut surtout prendre en compte pour quelle matériels et client nous voulons faire le driver.
+
+
+## Exercice 4
+
+
+
+## Exercice 5
+
+
+## Exercice 6
