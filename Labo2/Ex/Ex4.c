@@ -18,6 +18,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdint.h>
+#include <sys/mman.h>
+
 
  // definition des constantes
 typedef volatile unsigned int 		vuint;
@@ -29,48 +31,58 @@ typedef volatile unsigned int 		vuint;
 
 #define NB_DISPLAY  16
 
+#define REG_SIZE		            0x1000
+
 
 int main() {
 
 
-	int erno,fd;
-	uint32_t info = 1; /* unmask */
-	ssize_t nb = 0;
+	int fd;
 	 
 	// Pointeur sur la zone memoire 
 	vuint *seg = NULL;
 	
 	// indice du tableau de la valeur a afficher
-	unsigned char indice = 8;
 	unsigned int valKey = 0;
 	bool clikedKey3 = false;
 	
 	printf("******************************\nExercice 4 -- Labo 2\n******************************\n");
 	
-	// Ouvre le fichier /dev/mem
+	// Ouvre le fichier /dev/uio0
 	if ( (fd = open("/dev/uio0",O_RDWR)) < 0 ) {
 		fprintf(stderr,"ouverture du fichier /dev/uio0 impossible\n(err=%d / file=%s / line=%d)\n", fd, __FILE__,__LINE__);
 		return EXIT_FAILURE;
 	}
-	
-	
-	while (1) {
-        info = 1; /* unmask */
+	// Pas besoin d'offset car /dev/uio0 est déjà à la bonne addresse
+	if ( (seg = (vuint *) mmap(0, REG_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)0)) == NULL){
+		fprintf(stderr,"mmap impossible\n(err=%d / file=%s / line=%d)\n", fd, __FILE__,__LINE__);
+		return EXIT_FAILURE;
+	}
 
-        nb = write(fd, &info, sizeof(info));
-        if (nb != (ssize_t)sizeof(info)) {
-            perror("write");
-            close(fd);
-            exit(EXIT_FAILURE);
-        }
-
-        /* Wait for interrupt */
-        nb = read(fd, &info, sizeof(info));
-        if (nb == (ssize_t)sizeof(info)) {
-            /* Do something in response to the interrupt. */
-            printf("Interrupt #%u!\n", info);
-        }
-    }
+	
+	while(1) {
+		
+		// recupere la valeur des boutons
+		valKey = seg[KEY];
+		
+		// s'il y a decrementation
+		if (valKey == 8) {
+			// si le bouton etait pas presse avant
+			if(!clikedKey3) {
+				clikedKey3=true;
+				
+				printf("Click !\n");
+			}
+		} else {
+			clikedKey3=false;
+		}
+		
+		// Quit
+		if (valKey == 1) { 
+			printf("Bye !!\n");
+			return EXIT_SUCCESS;
+		} 
+	}
 
 
 	// ferme le fichier

@@ -9,9 +9,10 @@ lien : http://reds-calculator.einet.ad.eivd.ch/drv_2019/
 
 Commandes :
 
-**git clone https://github.com/altera-opensource/linux-socfpga.git**
-**cd linux-socfpga**
-**git checkout socfpga-4.14.130-ltsi**
+ - **git clone https://github.com/altera-opensource/linux-socfpga.git**
+ - **cd linux-socfpga**
+ - **git checkout socfpga-4.14.130-ltsi**
+
 configuration :
 **make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- socfpga_defconfig**
 architecure: arm
@@ -22,7 +23,8 @@ Cela permet de compiler le noyau avec toutes les configurations correspendontes 
 **grep UIO .config** permet de savoir si les userspace drivers sont actifs.
 (UIO = Userspace I/O, vous trouvez l’howto officiel ici: https://www.kernel.org/doc/html/v4.14/driver-api/uio-howto.html).
 
-Compilation avec **modification de la configuration.**
+Compilation avec **modification de la configuration :**
+
 **make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- menuconfig**
 
 / UIO 	-> ajouter en module "Userspace I/O platform driver with generic IRQ handling"
@@ -32,26 +34,28 @@ exit and save
 
 Il faut ensuite **modifier le device tree** pour qu’on puisse gérer les boutons avec le UIO driver. (save l'ancien .dts)
 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts-> ajouter :
-drv-btn {
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;compatible = "drv-btn";
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reg = <0xFF200000 0x1000>;
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interrupts = <0 41 1>;
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interrupt-parent = <&intc>;
-};
+
+
+    drv-btn {
+      compatible = "drv-btn";
+      reg = <0xFF200000 0x1000>;
+      interrupts = <0 41 1>;
+      interrupt-parent = <&intc>;
+    };
 
 On indique l'adresse du registre et sa taille ainsi que les numéros d'interruptions.
 
 **compiler le noyau, les modules, et le device tree.**
-![image](/img/cmd_compile_noyau_modules_dt.png)
+![image](./img/cmd_compile_noyau_modules_dt.png)
 
 Avertissement : le nom du répertoire source dans la dernière commande pourrait changer!! (ajout de sudo)
 
-Ces commandes permettent de compiler le noyau, les modules et le device tree. Ensuite, copie les anciens fichiers pour les sauvgarder et place le nouveau noyau et dtb dans le dossier /var/lib/tftpboot/ afin de les deployer sur la carte. Finalement, place les modules précèdemment compilés dans /export/drv/.
+Ces commandes permettent de compiler le noyau, les modules et le device tree. Ensuite, copie les anciens fichiers pour les sauvgarder et place le nouveau noyau et dtb dans le dossier **/var/lib/tftpboot/** afin de les deployer sur la carte. Finalement, place les modules précèdemment compilés dans **/export/drv/**.
 
 Finalement, après avoir boot sur la carte :
-cd /lib/modules
-rm * -rf
-mv /home/root/drv/4.14.130-ltsi-13527-g567dd6b26fcf-dirty/ .
+- cd /lib/modules
+- rm * -rf
+- mv /home/root/drv/4.14.130-ltsi-13527-g567dd6b26fcf-dirty/ .
 
 après redemarrage, il faut verifier que les drivers user-space soient disponible en modules avec :
 **zcat /proc/config.gz | grep UIO**
@@ -81,7 +85,7 @@ Exemple pour "CPU power management":
 - CAN
 - Device Drivers
 - GPIO
-- Block layer
+- Block layer (tout ce qui ne travail pas par octet)
 - Kernel hacking (printk/dmwesg/compiler/debug )
 - Hardware I/O
 - WathDog
@@ -95,7 +99,8 @@ Exemple pour "CPU power management":
 ## Exercice 2
 Il a fallu écrire un logiciel user-space qui affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3. Ce logiciel est en annexe au nom de Ex2.c.
 
-Afin de tester le fonctionnement du programme, il faut commencer par le compiler avec la toolchain suivante :arm-linux-gnueabihf-gcc. Ensuite, il faut placer l'executable sur la carte (via /export/drv) puis l'executer avec "./".
+Afin de tester le fonctionnement du programme, il faut commencer par le compiler avec la toolchain suivante :arm-linux-gnueabihf-gcc.
+Ensuite, il faut placer l'executable sur la carte (via /export/drv) puis l'executer avec "./".
 
 Je pense que la différence avec l'utilisation de mmap() et des UIO permet de limiter l'accès à la memoire grâce à la descprition faite dans la dts. De plus, je crois qu'il y a la possibilité de recevoir des interruptions.
 
@@ -120,8 +125,13 @@ En bref je dirais qu'il faut surtout prendre en compte pour quelle matériels et
 ## Exercice 4
 
 
+if ( (fd = open("/dev/uio0",O_RDWR)) < 0 ) {
+
+if ( (seg = (vuint *) mmap(0, getpagesize(), PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)0)) == NULL){
+
 
 ## Exercice 5
 
+watch -n1 "cat /proc/interrupts"
 
 ## Exercice 6
