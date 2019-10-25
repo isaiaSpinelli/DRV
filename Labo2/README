@@ -84,6 +84,7 @@ Exemple pour "CPU power management":
 - Network
 - CAN
 - Device Drivers
+- Firmware
 - GPIO
 - Block layer (tout ce qui ne travail pas par octet)
 - Kernel hacking (printk/dmwesg/compiler/debug )
@@ -95,6 +96,9 @@ Exemple pour "CPU power management":
 - Sensors
 - File system
 - Securité
+- Cryptographic API
+- Virtualization
+- Library routines
 
 ## Exercice 2
 Il a fallu écrire un logiciel user-space qui affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3. Ce logiciel est en annexe au nom de Ex2.c.

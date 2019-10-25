@@ -3,7 +3,7 @@
  *
  * File       : Ex4.c Labo2
  * Author     : Spinelli Isaia
- * Created on : 12.11.2019
+ * Created on : 12.10.2019
  *
  * Description  : affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3.
  *

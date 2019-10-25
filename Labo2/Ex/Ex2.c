@@ -3,7 +3,7 @@
  *
  * File       : Ex2.c Labo2
  * Author     : Spinelli Isaia
- * Created on : 12.11.2019
+ * Created on : 12.10.2019
  *
  * Description  : affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3.
  *
@@ -47,7 +47,7 @@ int main() {
 		return EXIT_FAILURE;
 	}
 	
-	// getpagesize() = 4096
+	// getpagesize() = 4096 = 0x1000
 	// map la zone memoire voulu
 	if ( (seg = (vuint *) mmap(0, getpagesize(), PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)BASE_ADDR_SEG)) == NULL){
 		fprintf(stderr,"mmap impossible\n(err=%d / file=%s / line=%d)\n", fd, __FILE__,__LINE__);
@@ -60,7 +60,7 @@ int main() {
 		// recupere la valeur des boutons
 		valKey = seg[KEY];
 		
-		// s'il y a decrementation
+		// s'il le bouton KEY3 est presse
 		if (valKey == 8) {
 			// si le bouton etait pas presse avant
 			if(!clikedKey3) {
