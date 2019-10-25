@@ -1,7 +1,7 @@
 /**************************************************************************
  * HEIG-VD, Institut REDS
  *
- * File       : Ex5.c Labo2
+ * File       : Ex4.c Labo2
  * Author     : Spinelli Isaia
  * Created on : 25.10.2019
  *

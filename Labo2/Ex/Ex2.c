@@ -79,6 +79,12 @@ int main() {
 		} 
 	}
 
+	// ferme la zone memoire virutelle mappee
+	if(munmap (seg, getpagesize()) != 0) {
+		fprintf(stderr,"munmap() impossible\n(err=%d / file=%s / line=%d)\n", *fd, __FILE__,__LINE__);
+		close(fd);
+		return EXIT_FAILURE;
+	}
 	// ferme le fichier
 	close(fd);
 	return EXIT_SUCCESS;

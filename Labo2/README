@@ -139,3 +139,5 @@ if ( (seg = (vuint *) mmap(0, getpagesize(), PROT_READ|PROT_WRITE, MAP_SHARED, f
 watch -n1 "cat /proc/interrupts"
 
 ## Exercice 6
+poll : permet beaucoup plus de possibilité, timeout en ms, le multiplexage, des prioritée,...
+select :

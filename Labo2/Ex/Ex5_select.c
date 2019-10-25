@@ -1,7 +1,7 @@
 /**************************************************************************
  * HEIG-VD, Institut REDS
  *
- * File       : Ex5.c Labo2
+ * File       : Ex5_select.c Labo2
  * Author     : Spinelli Isaia
  * Created on : 25.10.2019
  *
@@ -35,8 +35,8 @@ typedef volatile unsigned int 		vuint;
 #define NB_DISPLAY  16
 
 #define REG_SIZE		            0x1000
-#define MASK_REG		            KEY+2
-#define CLEAR_REG		            KEY+3
+#define MASK_REG		            2
+#define EDGE_REG		            3
 
 #define NB_BLAGUE		            11
 
@@ -78,6 +78,10 @@ int main() {
 	// pour quitter le programme
 	bool quit = false;
 	
+	// pour le select
+	fd_set rfds;
+	int retval;
+	
 
 	printf("******************************\nExercice 5 -- Labo 2\n******************************\n");
 	
@@ -86,6 +90,11 @@ int main() {
 		perror("initDRV() fail...\n");
 		exit(EXIT_FAILURE);
 	}
+	
+	// fait le lien avec le device /dev/uio1 pour le select
+	FD_ZERO(&rfds);
+	FD_SET(fd, &rfds);
+
 
 	while(!quit) {
 		
@@ -97,20 +106,23 @@ int main() {
 			exit(EXIT_FAILURE);
 		}
 		
-		 /* Wait for interrupt */
-		nb = read(fd, &info, sizeof(info));
-		if (nb == (ssize_t)sizeof(info)) {
-			// appelle le handler d'interruption
+		// attend jusqu'a que le device envoie une interruption
+		retval = select(fd+1, &rfds, NULL, NULL, NULL);	
+		// s'il y a une erreur
+	   if (retval == -1)
+		   perror("select()");
+		// Si le device est pret
+	   else if (retval > 0) {
+			
+		   // appelle le handler d'interruption
 			numKey = handler(seg);
 			// gestion de la blague
 			if ( gestionBlague(numKey) == -1 ) {
 				printf("Quit !\n"); 
 				quit=true;
 			}
-
-		}
-				
-
+	   }
+               
 	}
 	
 	// quitte correctement le programme
@@ -139,10 +151,10 @@ bool initDRV(int* fd, uint32_t ** seg) {
 	}
 	
 	// Ecriture de 1 dans l'interruptmask register (demasque les interruptions)
-	(*seg)[MASK_REG] = (uint32_t)0xf;
+	(*seg)[KEY+MASK_REG] = (uint32_t)0xf;
 	
 	// ecrire 1 dans edgecapture (clear les interruptions)
-	(*seg)[CLEAR_REG] = (uint32_t)0xf;
+	(*seg)[KEY+EDGE_REG] = (uint32_t)0xf;
 	
 	return EXIT_SUCCESS;
 }
@@ -167,10 +179,10 @@ bool closeDRV(int* fd, void * seg) {
 // handler de l'interruption
 uint32_t handler(uint32_t * seg) {
 	// Lis quel key a ete pressee
-	uint32_t numKey = seg[KEY+3];
+	uint32_t numKey = seg[KEY+EDGE_REG];
 
 	// clear l'inerrupt
-	seg[CLEAR_REG] = numKey;
+	seg[KEY+EDGE_REG] = numKey;
 	
 	return numKey;
 
@@ -188,7 +200,7 @@ int gestionBlague(uint32_t keyNum){
 		if (compteurBlague >= NB_BLAGUE)
 			compteurBlague = 0;
 		printf(blagueTab[compteurBlague++]);
-	} else if (blague) { // evalutation de la blague
+	} else if (blague && keyNum != 0) { // evalutation de la blague
 		blague = false;
 		switch(keyNum){
 			case 1: printf(":-D\n"); break;
