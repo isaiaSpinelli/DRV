@@ -83,7 +83,7 @@ int main() {
 	int retval;
 	
 
-	printf("******************************\nExercice 5 -- Labo 2\n******************************\n");
+	printf("******************************\nExercice 6 -- Labo 2\n******************************\n");
 	
 	// init du DRV
 	if ( initDRV(&fd, &seg) == EXIT_FAILURE ) {
@@ -113,13 +113,16 @@ int main() {
 		   perror("select()");
 		// Si le device est pret
 	   else if (retval > 0) {
-			
-		   // appelle le handler d'interruption
-			numKey = handler(seg);
-			// gestion de la blague
-			if ( gestionBlague(numKey) == -1 ) {
-				printf("Quit !\n"); 
-				quit=true;
+			// S'il y a bien une interrupt
+            nb = read(fd, &info, sizeof(info));
+            if (nb == (ssize_t)sizeof(info)) {
+			   // appelle le handler d'interruption
+				numKey = handler(seg);
+				// gestion de la blague
+				if ( gestionBlague(numKey) == -1 ) {
+					printf("Quit !\n"); 
+					quit=true;
+				}
 			}
 	   }
                

@@ -1,7 +1,7 @@
 /**************************************************************************
  * HEIG-VD, Institut REDS
  *
- * File       : Ex5_poll.c Labo2
+ * File       : Ex4.c Labo2
  * Author     : Spinelli Isaia
  * Created on : 25.10.2019
  *
@@ -20,7 +20,6 @@
 #include <stdint.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <poll.h>
 
 
  // definition des constantes
@@ -36,8 +35,8 @@ typedef volatile unsigned int 		vuint;
 #define NB_DISPLAY  16
 
 #define REG_SIZE		            0x1000
-#define MASK_REG		            2
-#define EDGE_REG		            3
+#define MASK_REG		            KEY+2
+#define CLEAR_REG		            KEY+3
 
 #define NB_BLAGUE		            11
 
@@ -79,20 +78,15 @@ int main() {
 	// pour quitter le programme
 	bool quit = false;
 	
-	
-	printf("******************************\nExercice 5 -- Labo 2\n******************************\n");
+
+	printf("******************************\nExercice 6 -- Labo 2\n******************************\n");
 	
 	// init du DRV
 	if ( initDRV(&fd, &seg) == EXIT_FAILURE ) {
 		perror("initDRV() fail...\n");
 		exit(EXIT_FAILURE);
 	}
-	
-	struct pollfd fds = {
-		.fd = fd,
-		.events = POLLIN,
-	};
-	
+
 	while(!quit) {
 		
 		// demasque les interrupts
@@ -103,28 +97,18 @@ int main() {
 			exit(EXIT_FAILURE);
 		}
 		
-		printf("test\n");
-		
-		// Poll les interruptions
-		int ret = poll(&fds, 1, -1);
-        if (ret >= 1) {
-			// S'il y a bien une interrupt
-            nb = read(fd, &info, sizeof(info));
-            if (nb == (ssize_t)sizeof(info)) {
-                // appelle le handler d'interruption
-				numKey = handler(seg);
-				// gestion de la blague
-				if ( gestionBlague(numKey) == -1 ) {
-					printf("Quit !\n"); 
-					quit=true;
-				}
-            }
-        } else {
-            perror("poll()");
-            close(fd);
-            exit(EXIT_FAILURE);
-        }
-        
+		 /* Wait for interrupt */
+		nb = read(fd, &info, sizeof(info));
+		if (nb == (ssize_t)sizeof(info)) {
+			// appelle le handler d'interruption
+			numKey = handler(seg);
+			// gestion de la blague
+			if ( gestionBlague(numKey) == -1 ) {
+				printf("Quit !\n"); 
+				quit=true;
+			}
+
+		}
 				
 
 	}
@@ -155,10 +139,10 @@ bool initDRV(int* fd, uint32_t ** seg) {
 	}
 	
 	// Ecriture de 1 dans l'interruptmask register (demasque les interruptions)
-	(*seg)[KEY+MASK_REG] = (uint32_t)0xf;
+	(*seg)[MASK_REG] = (uint32_t)0xf;
 	
 	// ecrire 1 dans edgecapture (clear les interruptions)
-	(*seg)[KEY+EDGE_REG] = (uint32_t)0xf;
+	(*seg)[CLEAR_REG] = (uint32_t)0xf;
 	
 	return EXIT_SUCCESS;
 }
@@ -183,10 +167,10 @@ bool closeDRV(int* fd, void * seg) {
 // handler de l'interruption
 uint32_t handler(uint32_t * seg) {
 	// Lis quel key a ete pressee
-	uint32_t numKey = seg[KEY+EDGE_REG];
+	uint32_t numKey = seg[KEY+3];
 
 	// clear l'inerrupt
-	seg[KEY+EDGE_REG] = numKey;
+	seg[CLEAR_REG] = numKey;
 	
 	return numKey;
 
