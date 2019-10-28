@@ -4,6 +4,8 @@ Spinelli isaia
 
 lien : http://reds-calculator.einet.ad.eivd.ch/drv_2019/
 
+Remarque: Le code a été écrit de manière propre à partir de l'exercice 5. Je m'en excuse d'avance et espère que vous n'y prendrez pas compte.
+
 
 ## Téléchargement du noyau Linux et ajout des modules pour le User-space I/O
 
@@ -27,9 +29,9 @@ Compilation avec **modification de la configuration :**
 
 **make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- menuconfig**
 
-/ UIO 	-> ajouter en module "Userspace I/O platform driver with generic IRQ handling"
-/ LBDAF -> activer "Support for large (2TB+) block devices and files"
-exit and save
+1. / UIO 	-> ajouter en module "Userspace I/O platform driver with generic IRQ handling"
+2. / LBDAF -> activer "Support for large (2TB+) block devices and files"
+3. exit and save
 
 
 Il faut ensuite **modifier le device tree** pour qu’on puisse gérer les boutons avec le UIO driver. (save l'ancien .dts)
@@ -58,39 +60,32 @@ Finalement, après avoir boot sur la carte :
 - mv /home/root/drv/4.14.130-ltsi-13527-g567dd6b26fcf-dirty/ .
 
 après redemarrage, il faut verifier que les drivers user-space soient disponible en modules avec :
+
 **zcat /proc/config.gz | grep UIO**
 
 ## Exercice 1
 
-Afin de rechercher et analyser rapidement dans les configurations, j'utilise **cat .config | grep -n ""** pour avoir les ligne qui m'interesse et ensuite j'ouvre le .config avec **less** et avec la commande **{line}g** je saute directement à la ligne souhaitée. **/search**->Search forward  **?search**->Search backward
+Afin de rechercher et analyser rapidement dans les configurations, j'utilise une interface qui me permet de facilement me balader dans les configurations. Il est possible d'avoir une interface pour configurer le noyau linux de plusieurs manière (make menuconfig ou xconfig).
+Voici une liste des options principales configurable pour le noyaux linux :
 
-Exemple pour "CPU power management":
-![image](/img/search_cpu.png)
-**less .config**
-:**612g**
-
-- configurations général
-- IRQ
-- Timers
-- CPU/Task time
-- RCU
-- Performance du noyau
+- configurations général (IRQ,CPU/Task time, RCU,Performance du noyau, GCC,...)
 - GCOV based kernel profiling (outil d'analyse de couverture de code )
 - type de partitions
 - Ordonnacneurs
-- Bus
+- Bus options
 - Boot options
-- CPU Power management
+- CPU Power management (ACPI / SFI / CPU Frequency scaling / idle PM support)
 - Network
 - CAN
 - Device Drivers
 - Firmware
 - GPIO
 - Block layer (tout ce qui ne travail pas par octet)
-- Kernel hacking (printk/dmwesg/compiler/debug )
+- Loadable module support
+- Kernel hacking (printk/dmwesg/compiler/debug/runtime testing )
 - Hardware I/O
 - WathDog
-- DMA
+- DMA / Timers / random memoire / MTRR /... (Processor type and features)
 - Clock
 - ADC
 - Sensors
@@ -99,6 +94,17 @@ Exemple pour "CPU power management":
 - Cryptographic API
 - Virtualization
 - Library routines
+
+Voici les desciprtions plus détaillées des sections demandées :
+
+CPU power management :
+
+GPIO support :
+
+Block layer :
+
+Kernel hacking :
+
 
 ## Exercice 2
 Il a fallu écrire un logiciel user-space qui affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3. Ce logiciel est en annexe au nom de Ex2.c.
@@ -114,30 +120,41 @@ Je pense que la différence avec l'utilisation de mmap() et des UIO permet de li
 ### drivers user-space
 
 #### Avantages
-Rapide car moins de commutations de contexte utilisateur-noyau.
-Pas de plantage du système.
-Accès à pleins de bibliothèques donc surement plus simple à coder.
-Facilement déboguer avec des outils
+- Rapide car moins de commutations de contexte utilisateur-noyau.
+- Pas de plantage du système.
+- Accès à pleins de bibliothèques donc surement plus simple à coder.
+- Facilement déboguer avec des outils
+- pour
+
 
 #### Désavantages
-Presque tous sont basés sur du polling.
-Fait sens seulement quand tous les clients sont dans l'espace utilisateur.
+- Presque tous sont basés sur du polling.
+- Fait sens seulement quand tous les clients sont dans l'espace utilisateur.
+swap
+
+
 
 En bref je dirais qu'il faut surtout prendre en compte pour quelle matériels et client nous voulons faire le driver.
 
 
 ## Exercice 4
 
+Pour commencer, il faut enlever "uio_pdrv_genirq" de la mémoire et le charger à nouveau avec le bon id :
 
-if ( (fd = open("/dev/uio0",O_RDWR)) < 0 ) {
+modprobe -r uio_pdrv_genirq; modprobe uio_pdrv_genirq of_id="drv-btn"
 
-if ( (seg = (vuint *) mmap(0, getpagesize(), PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)0)) == NULL){
-
+Le code est en annexe (Ex4.c)
 
 ## Exercice 5
 
 watch -n1 "cat /proc/interrupts"
 
 ## Exercice 6
+read :
 poll : permet beaucoup plus de possibilité, timeout en ms, le multiplexage, des prioritée,...
 select :
+
+
+
+Remarque: Afin  d'être le plus générique possible dans le code, je pense qu'il serait preferable de lire dans /sys/class/uio/uio0/device/uio/uio0/maps afin de récupérer les informations du device de facon sûr et générique.
+![image](./img/info-device.png)

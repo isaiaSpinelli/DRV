@@ -85,8 +85,8 @@ int main() {
 	}
 
 	// ferme la zone memoire virutelle mappee
-	if(munmap (seg, REG_SIZE) != 0) {
-		fprintf(stderr,"munmap() impossible\n(err=%d / file=%s / line=%d)\n", *fd, __FILE__,__LINE__);
+	if(munmap ((void*)seg, REG_SIZE) != 0) {
+		fprintf(stderr,"munmap() impossible\n(err=%d / file=%s / line=%d)\n", fd, __FILE__,__LINE__);
 		close(fd);
 		return EXIT_FAILURE;
 	}

@@ -1,11 +1,11 @@
 /**************************************************************************
  * HEIG-VD, Institut REDS
  *
- * File       : Ex5_poll.c Labo2
+ * File       : Ex6_poll.c Labo2
  * Author     : Spinelli Isaia
- * Created on : 25.10.2019
+ * Created on : 28.10.2019
  *
- * Description  : affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3.
+ * Description  : affiche sur le terminal une blague à chaque fois que l’utilisateur appuie sur le bouton KEY3 et lui permet de l’évaluer avec les touches KEY0, …, KEY3
  *
  * Reference :  https://yurovsky.github.io/2014/10/10/linux-uio-gpio-interrupt.html
  ************************************************************************** 
@@ -23,31 +23,33 @@
 #include <poll.h>
 
 
- // definition des constantes
-typedef volatile unsigned int 		vuint;
-#define BASE_ADDR_SEG      			(vuint *) 0xFF200000
-#define LED		            		0x00
-#define SEG7_3_0            		0x08
-#define SEG7_5_4            		0x0C
-#define KEY		            		0x14
+// Definition des constantes
+typedef volatile uint32_t 			vuint32;
+#define LW_BRIDGE_BASE        		0xFF200000
+#define KEY_BASE              		0x00000050
 
 #define BASE      					0x00
 
-#define NB_DISPLAY  16
-
-#define REG_SIZE		            0x1000
+#define REG_SIZE		            getpagesize()
 #define MASK_REG		            2
 #define EDGE_REG		            3
 
 #define NB_BLAGUE		            11
 
-// definition des fonctions
-bool initDRV(int* fd, uint32_t ** seg);
-bool closeDRV(int* fd, void * seg);
+// Definition des fonctions
+bool initDRV(int* fd, void ** addr);
+bool closeDRV(int fd, void * LW_virtual);
 int gestionBlague(uint32_t keyNum);
-uint32_t handler(uint32_t * seg);
+uint32_t handler(vuint32 * seg);
 
-// definition globale
+/*Prototypes for functions used to access physical memory addresses*/
+int open_physical (int); 
+void* map_physical (int,unsigned int,unsigned int);
+void close_physical (int);
+int unmap_physical (void*, unsigned int);
+
+
+// Definition globale
 char *blagueTab[NB_BLAGUE] = { 
   "Quel est le fromage préféré de Brigitte Macron ?\nLe Président\n",
   "Qu’est-ce qu’un nem avec des écouteurs ?\nUn NemP3…\n",
@@ -68,34 +70,44 @@ int main() {
 	// used to open /dev/uio1
 	int fd = -1;
 	 
-	// Pointeur sur la zone memoire 
-	uint32_t *seg = NULL;
+	// Pointeur memoire
+	void* LW_virtual;
+	vuint32* KEYS_ptr;
 	
 	// Gestion des interruptions
 	uint32_t info = 1; 
 	ssize_t nb =0;
 	uint32_t numKey= 0;
 	
-	// pour quitter le programme
+	// Pour quitter le programme
 	bool quit = false;
 	
-	
+
 	printf("******************************\nExercice 6 -- Labo 2\n******************************\n");
 	
 	// init du DRV
-	if ( initDRV(&fd, &seg) == EXIT_FAILURE ) {
+	if ( initDRV(&fd, &LW_virtual) == EXIT_FAILURE ) {
 		perror("initDRV() fail...\n");
 		exit(EXIT_FAILURE);
 	}
 	
+	// pour le poll
 	struct pollfd fds = {
 		.fd = fd,
 		.events = POLLIN,
 	};
+	int retval;
+	
+	// maj du pointeur sur les boutons
+	KEYS_ptr = (vuint32*) (LW_virtual + KEY_BASE);
+	// Ecriture de 1 dans l'interruptmask register (demasque les interruptions)
+	KEYS_ptr[MASK_REG] = (uint32_t)0xf;
+	// Ecrire 1 dans edgecapture (clear les interruptions)
+	KEYS_ptr[EDGE_REG] = (uint32_t)0xf;
 	
 	while(!quit) {
 		
-		// demasque les interrupts
+		// Demasque les interruptions
 		nb = write(fd, &info, sizeof(info));
 		if (nb != (ssize_t)sizeof(info)) {
 			perror("write\n");
@@ -103,12 +115,11 @@ int main() {
 			exit(EXIT_FAILURE);
 		}
 		
-		printf("test\n");
-		
-		// Poll les interruptions (seulement sur /dev/uio0)
-		int ret = poll(&fds, 1, -1);
-        if (ret >= 1) {
-			// S'il y a bien une interrupt
+		// Attend jusqu'a que le device envoie une interruption
+		retval = poll(&fds, 1, -1);
+		// S'il y a pas d'erreur
+		if (retval >= 1) {
+			// indique qu'on traite l'interruption
             nb = read(fd, &info, sizeof(info));
             if (nb == (ssize_t)sizeof(info)) {
                 // appelle le handler d'interruption
@@ -124,13 +135,11 @@ int main() {
             close(fd);
             exit(EXIT_FAILURE);
         }
-        
-				
-
+               
 	}
 	
-	// quitte correctement le programme
-	if ( closeDRV(&fd, seg) == EXIT_FAILURE ) {
+	// Quitte correctement le programme
+	if ( closeDRV(fd, LW_virtual) == EXIT_FAILURE ) {
 		perror("closeDRV() fail...\n");
 		exit(EXIT_FAILURE);
 	}
@@ -139,54 +148,38 @@ int main() {
 	return EXIT_SUCCESS;
 }
 
-// initialisation du driver
-bool initDRV(int* fd, uint32_t ** seg) {
-	
-	// Ouvre le fichier /dev/uio0
-	if ( (*fd = open("/dev/uio0",O_RDWR)) < 0 ) {
-		fprintf(stderr,"ouverture du fichier /dev/uio0 impossible\n(err=%d / file=%s / line=%d)\n", *fd, __FILE__,__LINE__);
+// Initialisation du driver
+bool initDRV(int* fd, void ** addr) {
+
+	// Ouvre le fichier /dev/uio0	
+	if((*fd = open_physical(*fd)) == -1)
 		return EXIT_FAILURE;
-	}
-	// Pas besoin d'offset car /dev/uio0 est déjà à la bonne addresse (dts)
-	if ( (*seg = (uint32_t *) mmap(NULL, REG_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, *fd, (off_t)BASE)) == NULL){
-		fprintf(stderr,"mmap impossible\n(err=%d / file=%s / line=%d)\n", *fd, __FILE__,__LINE__);
-		close(*fd);
+		
+	
+	// Mappage de l'adresse 
+	if ((*addr = map_physical (*fd, BASE, REG_SIZE)) == NULL)
 		return EXIT_FAILURE;
-	}
-	
-	// Ecriture de 1 dans l'interruptmask register (demasque les interruptions)
-	(*seg)[KEY+MASK_REG] = (uint32_t)0xf;
-	
-	// ecrire 1 dans edgecapture (clear les interruptions)
-	(*seg)[KEY+EDGE_REG] = (uint32_t)0xf;
-	
+		
 	return EXIT_SUCCESS;
 }
 
 // Fermeture du driver
-bool closeDRV(int* fd, void * seg) {
+bool closeDRV(int fd, void * addr) {
 	
-	// ferme la zone memoire virutelle mappee
-	if(munmap (seg, REG_SIZE) != 0) {
-		fprintf(stderr,"munmap() impossible\n(err=%d / file=%s / line=%d)\n", *fd, __FILE__,__LINE__);
-		close(*fd);
-		return EXIT_FAILURE;
-	}
-
-	// ferme le fichier
-	close(*fd);
+	unmap_physical (addr, REG_SIZE);
+	close_physical (fd);
 	
 	return EXIT_SUCCESS;
 }
 
 
 // handler de l'interruption
-uint32_t handler(uint32_t * seg) {
+uint32_t handler(vuint32 * addr) {
 	// Lis quel key a ete pressee
-	uint32_t numKey = seg[KEY+EDGE_REG];
+	uint32_t numKey = addr[EDGE_REG];
 
 	// clear l'inerrupt
-	seg[KEY+EDGE_REG] = numKey;
+	addr[EDGE_REG] = numKey;
 	
 	return numKey;
 
@@ -204,7 +197,7 @@ int gestionBlague(uint32_t keyNum){
 		if (compteurBlague >= NB_BLAGUE)
 			compteurBlague = 0;
 		printf(blagueTab[compteurBlague++]);
-	} else if (blague) { // evalutation de la blague
+	} else if (blague && keyNum != 0) { // evalutation de la blague
 		blague = false;
 		switch(keyNum){
 			case 1: printf(":-D\n"); break;
@@ -218,4 +211,47 @@ int gestionBlague(uint32_t keyNum){
 	}
 	
 	return 1;
+}
+
+// Open /dev/uio0 to give access to physical addresses
+int open_physical(int fd) {
+	if (fd == -1){
+		if ((fd = open( "/dev/uio0", (O_RDWR | O_SYNC))) == -1) {
+			fprintf(stderr,"ouverture du fichier /dev/uio0 impossible\n(err=%d / file=%s / line=%d)\n", fd, __FILE__,__LINE__);
+			return -1;
+		}
+	}
+	return fd;
+}
+// Close /dev/uio0 to give access to physical addresses
+void close_physical (int fd) {
+	close(fd);
+}
+
+// Establish a virtual address mapping for the physical addresses starting at base, and extending by span bytes
+void* map_physical(int fd,unsigned int base,unsigned int span) {
+	
+	void * virtual_base;
+	
+	// Get a mapping from physical addresses to virtual addresses
+	virtual_base = mmap (NULL, REG_SIZE, (PROT_READ | PROT_WRITE), MAP_SHARED,fd, (off_t) base);
+	
+	if (virtual_base == MAP_FAILED) {
+		fprintf(stderr,"mmap impossible\n(file=%s / line=%d)\n", __FILE__,__LINE__);
+		close (fd);
+		return(NULL);
+	}
+	
+	return virtual_base;
+}
+
+/*Close the previously-opened virtual address mapping*/
+int unmap_physical(void* virtual_base, unsigned int span) { 
+	
+	if(munmap (virtual_base, span) != 0) {
+		fprintf(stderr,"munmap() impossible\n(file=%s / line=%d)\n", __FILE__,__LINE__);
+		return(-1); 
+	}
+	
+	return 0;
 }

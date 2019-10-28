@@ -11,3 +11,5 @@ cp /var/lib/tftpboot/zImage /var/lib/tftpboot/zImage.old
 cp arch/arm/boot/dts/socfpga_cyclone5_sockit.dtb /var/lib/tftpboot/socfpga.dtb
 cp arch/arm/boot/zImage /var/lib/tftpboot/
 sudo cp ./tmp/lib/modules/4.14.130-ltsi-13527-g567dd6b-dirty/ /export/drv/ -R
+
+modprobe -r uio_pdrv_genirq; modprobe uio_pdrv_genirq of_id="drv-btn"

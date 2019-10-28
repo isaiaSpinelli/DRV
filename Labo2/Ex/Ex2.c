@@ -3,7 +3,7 @@
  *
  * File       : Ex2.c Labo2
  * Author     : Spinelli Isaia
- * Created on : 12.10.2019
+ * Created on : 28.10.2019
  *
  * Description  : affiche sur l’écran un message lorsque l’utilisateur appuie sur le bouton KEY3.
  *
@@ -24,18 +24,15 @@ typedef volatile unsigned int 		vuint;
 #define SEG7_5_4            		0x0C
 #define KEY		            		0x14
 
-#define NB_DISPLAY  16
-
 
 int main() {
 
 
-	int erno,fd;
+	int fd;
 	// Pointeur sur la zone memoire 
 	vuint *seg = NULL;
 	
 	// indice du tableau de la valeur a afficher
-	unsigned char indice = 8;
 	unsigned int valKey = 0;
 	bool clikedKey3 = false;
 	
@@ -80,8 +77,8 @@ int main() {
 	}
 
 	// ferme la zone memoire virutelle mappee
-	if(munmap (seg, getpagesize()) != 0) {
-		fprintf(stderr,"munmap() impossible\n(err=%d / file=%s / line=%d)\n", *fd, __FILE__,__LINE__);
+	if(munmap ((void*)seg, getpagesize()) != 0) {
+		fprintf(stderr,"munmap() impossible\n(err=%d / file=%s / line=%d)\n", fd, __FILE__,__LINE__);
 		close(fd);
 		return EXIT_FAILURE;
 	}
