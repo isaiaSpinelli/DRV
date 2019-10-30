@@ -1,0 +1,182 @@
+# Laboratoire 3 DRV
+Spinelli isaia
+30.10.19
+
+lien : http://reds-lab.einet.ad.eivd.ch/drv_2019/lab_03/lab_03.html
+
+## Matériel nécessaire
+
+### Exercice 1
+
+Car je sais pas
+
+
+### Revenir à la version non-modifiée du noyau grâce à git:
+- git status
+- git checkout -- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+- rm tmp -rf
+- git status
+
+### Repartir depuis le fichier de configuration d’origine et activer le « Support for large (2TB+) block devices and files »
+- make clean
+- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- socfpga_defconfig
+- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- menuconfig
+
+( Activez le support LBDAF avec "/LBDAF" )
+
+### Nettoyer et recompiler le noyau:
+- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j12
+- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- modules
+- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH="./tmp" modules_install
+- make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- socfpga_cyclone5_sockit.dtb
+
+### Sauvgarde et mise à jour des fichiers pour le deployement sur la carte
+
+- cp /var/lib/tftpboot/socfpga.dtb /var/lib/tftpboot/socfpga.dtb.old
+- cp /var/lib/tftpboot/zImage /var/lib/tftpboot/zImage.old
+- cp arch/arm/boot/dts/socfpga_cyclone5_sockit.dtb /var/lib/tftpboot/socfpga.dtb
+- cp arch/arm/boot/zImage /var/lib/tftpboot/
+- sudo cp ./tmp/lib/modules/4.14.130-ltsi-13527-g567dd6b/ /export/drv/ -R
+
+Ces commandes permettent de copie les anciens fichiers pour les sauvgarder et place le nouveau noyau et dtb dans le dossier **/var/lib/tftpboot/** afin de les deployer sur la carte.
+Finalement, place les modules précèdemment compilés dans **/export/drv/**.
+
+Avertissement : le nom du répertoire source dans la dernière commande pourrait changer!! (ajout de sudo)
+
+Sur la carte:
+- cd /lib/modules
+- rm * -rf
+- mv /home/root/drv/4.14.130-ltsi-13527-g567dd6b/ .
+
+Redémarrez la carte. Le noyau chargé devrait maintenant être:
+- uname -ar
+Linux de1soclinux 4.14.130-ltsi-13527-g567dd6b26fcf #11 SMP Wed Oct 31 14:40:59 CET 2018 armv7l armv7l armv7l GNU/Linux
+
+## Introductions aux périphériques sous Linux
+
+### Exercice 2 (ls -al /dev)
+
+Tapez la commande "ls -al /dev" sur votre PC, et essayez de comprendre à quel périphérique chaque fichier que vous voyez est associé.
+
+urandom         1
+zero            1
+full            1
+ram0            1
+mem             1
+kmsg            1
+
+tty0            4
+
+tty / ttyprintk 5
+console         5
+
+loop0           7
+vcs             7
+
+sda             8
+
+
+autofs          10
+cpu_dma_latency 10
+hpet            10
+
+sr0             11
+
+sg0             21
+
+fb0             29
+
+ppp             108
+
+ttyUSB0         188
+
+hidraw0         249
+
+ptp0            250
+
+watchdog0       253
+
+rtc0            254
+
+
+Le périphérique /dev/ttyUSB0 au majeur 188 correspond lui à un matériel bien réel.
+C’est le convertisseur USB/série de la DE1-SoC, visible sur la machine si le câble USB est branché au connecteur console de la carte.
+Pour récupérer plus d’informations sur ce périphérique, les systèmes de fichiers virtuels /proc et /sys sont utiles.
+L’inspection du fichier /proc/devices, listant les périphériques block et char du système, permet de découvrir qu’il s’agit d’un périphérique de type caractère.
+
+
+### Exercice 3 (mknod)
+
+mknod permet de créer des fichiers spéciaux.
+
+Créez ensuite un fichier virtuel de type caractère avec le même couple majeur/mineur du fichier /dev/random. Qu’est-ce qui se passe lorsque vous lisez son contenu avec la commande cat?
+
+/dev/random : numéro majeur = 1 / numéro mineur = 8
+
+sudo mknod test c 1 8
+![image](./img/file_test.png)
+
+Lecture du fichier :
+![image](./img/cat_test_random.png)
+
+On peut voir quand dans les deux cas, des valeurs random sont généré envirion toutes les 4 secondes.
+
+
+### Exercice 4 (proc)
+Retrouvez l'information du périphérique ttyUSB0 de type caractère dans le fichier /proc/devices.
+
+affichier le fichier /proc/devices avec cat:
+![image](./img/ttyUSB-caractere.png)
+
+On peut voir que le périphérique /dev/ttyUSB0 est un périphérique de type caractère.
+
+### Exercice 5 (sysfs)
+
+sysfs contient davantage d’informations sur le périphérique.
+Retrouvez-le dans l’arborescence de sysfs, en particulier pour ce qui concerne le nom du driver utilisé et le type de connexion.
+
+![image](./img/dir-ttyusb.png)
+
+On peut voir que le driver ftdi_sio est utilisé pour ce driver.
+
+Ensuite, utilisez la commande lsmod pour confirmer que le driver utilisé est bien celui individué auparavant, et cherchez si d’autres drivers plus génériques sont impliqués.
+
+![image](./img/lsmod.png)
+
+Ici on voit clairement que le driver ftdi_sio utilise un driver encore plus générique qui est usbserial.
+
+
+
+## Compilation de modules
+
+En général, un driver simple se présente sous la forme d’un fichier C unique. Dans l’arborescence du noyau, les drivers compatibles avec toutes les architectures se situent dans le répertoire drivers à la racine du code source du noyau Linux. Les sous-répertoires représentent les différentes familles de périphériques. Le dossier char, par exemple, contient tous les périphériques de type char supportés, dont random et zero que nous avons vu auparavant. Lors de la compilation du noyau et selon les options de compilation choisies, les fichiers sources contenus dans ce répertoire seront inclus dans le noyau ou pas.
+
+Pour nos tests, il est plus simple de compiler un driver séparément. Pour faire ceci, il est nécessaire d’avoir les sources du noyau pour lequel le driver doit être compilé, et ces sources doivent déjà être configurées et un make modules doit avoir été préalablement effectué (ce qui est déjà le cas si les sources ont déjà été compilées une fois).
+
+
+*Remarque :
+Si vous êtes sous une distribution de type Debian ou dérivée, pour compiler des modules pour votre machine vous devez installer le paquet linux-headers correspondant à votre version du noyau (déjà installé sur la machine de laboratoire).*
+
+*sudo apt-get install linux-headers-$(uname -r)*
+
+
+### Exercice 6 (empty module)
+
+Compilez le module empty disponible dans l’archive des sources de ce laboratoire. Ensuite, montez-le dans le noyau, démontez-le, et analysez les messages enregistrés dans les logs.
+
+Après avoir un repertoire avec le bon Makefile et le bon chemin jusqu'à la source du noyau et le fichier source de empty, j'ai pu faire un make afin de généré le empty.ko.
+Ensuite, j'ai placé sur empty.ko dans /export/drv afin de le recuperer sur le carte DE1.
+Après, j'ai placé ce module dans Linux_Librairies/drivers pour pouvoir le monter avec insmod.
+Puis, le demonter avec rmmod.
+
+![image](./img/module_monte_demonte.png)
+
+Finalement, afficher les messages enregistrés avec dmesg.
+![image](./img/msg_driver_empty.png)
+
+
+
+Remarque :
+Lorsqu’on désire insérer un module ayant été compilé avec le noyau, la commande modprobe est préférée à la commande insmod, car elle va directement chercher le module dans le bon sous-répertoire de /lib/modules/ suivant le version du noyau démarré. Cette commande prends comme paramètres le nom du module (pas le chemin complet ni l’extension .ko), et s’occupe également de résoudre les dépendances entre modules en montant celles-ci avant le module demandé si nécessaire.
+
+### Exercice 7 (parrot module)

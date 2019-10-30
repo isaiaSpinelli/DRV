@@ -1,0 +1,1 @@
+cmd_/cours_REDS/PTR/DRV/Labo3/student_files/empty_module/empty.ko := arm-linux-gnueabihf-ld -EL -r  -T ./scripts/module-common.lds --build-id  -o /cours_REDS/PTR/DRV/Labo3/student_files/empty_module/empty.ko /cours_REDS/PTR/DRV/Labo3/student_files/empty_module/empty.o /cours_REDS/PTR/DRV/Labo3/student_files/empty_module/empty.mod.o ;  true
