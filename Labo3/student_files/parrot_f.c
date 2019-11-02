@@ -6,7 +6,11 @@
 #include <linux/slab.h>         /* Needed for kmalloc */
 #include <linux/uaccess.h>      /* copy_(to|from)_user */
 #include <linux/module.h>
+
 #include <linux/cdev.h>
+
+#include <linux/device.h>
+
 
 #include <linux/string.h>
 
@@ -160,11 +164,6 @@ static int __init parrot_init(void)
 		printk("Device Add Error\n");
 		return -1;
 	}
-	
-
-	printk("Execute ceci pour tester :\n");
-	printk("'sudo mknod /dev/nodeParrot c %d 0'\n", MAJOR_NUM);
-	printk("'sudo chmod 666 /dev/nodeParrot'\n");
 	
     buffer_size = 0;
 

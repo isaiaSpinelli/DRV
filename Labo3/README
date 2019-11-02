@@ -8,7 +8,11 @@ lien : http://reds-lab.einet.ad.eivd.ch/drv_2019/lab_03/lab_03.html
 
 ### Exercice 1
 
-Car je sais pas
+Car je sais pas sinon
+Car le paramètre en question n'est pas activé en tant que module donc le noyau nous empecherait de le charger.
+Mais il est possible de refaire une configuration est de le réacrtiver en module.
+
+
 
 
 ### Revenir à la version non-modifiée du noyau grâce à git:
@@ -162,7 +166,7 @@ Si vous êtes sous une distribution de type Debian ou dérivée, pour compiler d
 
 ### Exercice 6 (empty module)
 
-Compilez le module empty disponible dans l’archive des sources de ce laboratoire. Ensuite, montez-le dans le noyau, démontez-le, et analysez les messages enregistrés dans les logs.
+Compiler le module empty disponible dans l’archive des sources de ce laboratoire. Ensuite, il faut monter le dans le noyau, le demonter, et analyser les messages enregistrés dans les logs.
 
 Après avoir un repertoire avec le bon Makefile et le bon chemin jusqu'à la source du noyau et le fichier source de empty, j'ai pu faire un make afin de généré le empty.ko.
 Ensuite, j'ai placé sur empty.ko dans /export/drv afin de le recuperer sur le carte DE1.
@@ -180,3 +184,59 @@ Remarque :
 Lorsqu’on désire insérer un module ayant été compilé avec le noyau, la commande modprobe est préférée à la commande insmod, car elle va directement chercher le module dans le bon sous-répertoire de /lib/modules/ suivant le version du noyau démarré. Cette commande prends comme paramètres le nom du module (pas le chemin complet ni l’extension .ko), et s’occupe également de résoudre les dépendances entre modules en montant celles-ci avant le module demandé si nécessaire.
 
 ### Exercice 7 (parrot module)
+
+ Le module parrot_driver (disponible dans les sources de ce laboratoire), est un driver minimal de périphérique virtuel de type caractère. Il possède un majeur de 97. Un fois un device node associé à ce module, il est possible d’y écrire une chaîne de caractère, et de la récupérer à l’identique ou modifiée via une lecture standard. La configuration de la modification à effectuer sur la chaîne est réalisée grâce à un appel à ioctl() sur le device node. Un appel ioctl() prends deux paramètres entiers, et renvoie un entier. Le programme ioctl.c permet d’effectuer ces appels facilement. Si le premier paramètre de ioctl vaux 1, tout le contenu de la chaîne contenue dans le driver est mis en majuscule (si arg2 == 0) ou minuscule (si arg2 == 1). Si arg1 == 0, la casse est inversée.
+
+ Pour commencer, j'ai adapté 2 Makefiles afin de compiler pour ma machine et pour cross-compiler pour la carte DE1-soc.
+ Une fois compilé, j'ai pu insérer les modules sur les machines respectives tous en confirmant le bon montage des modules avec la commande dmesg.
+
+ ![image](./img/dmesg_parrot.png)
+
+Voici les informations possibles de récupérer sur ce periphérique avec les outils vu precedemment:
+
+Dans /proc/devices :
+![image](./img/info-parrot.png)
+
+Avec la commande lsmod :
+![image](./img/info_parrot_lsmod.png)
+
+Dans /proc/modules:
+![image](./img/info_parrot_module.png)
+
+Et finallement, dans sys/module :
+![image](./img/info_parrot_sys_module.png)
+
+Ensuite, j'ai crée un device node adapté au driver parrot et ajouter les droits pour un utilisateur courant puisse y acceder.
+
+![image](./img/mknod_nodeTest1.png)
+
+
+![image](./img/test_parrot_node.png)
+
+
+![image](./img/rmmod_parrot.png)
+
+
+![image](./img/lien_Sym.png)
+
+
+![image](./img/mobprobe.png)
+
+
+Afin que le module se charge automatiquement au démarrage, il faut ajouter celui-ci dans le fichier /etc/modules :
+
+![image](./img/etc_modules_add_parrot.png)
+
+Voici les logs du kernel au démarrage du système :
+
+![image](./img/dmesg_Demarrage.png)
+
+Remaque: Le premier message signifie que le module n'est pas signé par le fournisseur.
+
+
+
+Référence : https://gist.github.com/itrobotics/063aea3c72d1f7d7fb94
+
+![image](./img/check_new.png)
+
+![image](./img/test_new.png)

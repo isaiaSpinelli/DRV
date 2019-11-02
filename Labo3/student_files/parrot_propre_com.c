@@ -5,16 +5,11 @@
 #include <linux/fs.h>           /* Needed for file_operations */
 #include <linux/slab.h>         /* Needed for kmalloc */
 #include <linux/uaccess.h>      /* copy_(to|from)_user */
-#include <linux/module.h>
-#include <linux/cdev.h>
 
 #include <linux/string.h>
 
 // DEFINES
 #define MAJOR_NUM       97
-#define MINOR_NUM 		0
-#define MY_DEV_COUNT 	5
-
 #define DEVICE_NAME     "parrot"
 
 #define PARROT_CMD_TOGGLE   0
@@ -25,8 +20,6 @@
 char *global_buffer;
 // Donnée venant de l'espace utilisateur
 int buffer_size;
-
-struct cdev my_cdev;
 
 /* 
 * Modifie une chaine de caractère afin d'echanger 
@@ -138,34 +131,12 @@ const static struct file_operations parrot_fops = {
  * Initialise le module parrot
  */
 static int __init parrot_init(void)
-{	
-	dev_t devno;
-	unsigned int count = MY_DEV_COUNT;
-	int err;
-	
-	// Définie le numéro major et mineur
-	devno = MKDEV(MAJOR_NUM, MINOR_NUM);
-	// Enregistre l'appareil à caractère avec un nombre de device max
-	register_chrdev_region(devno, count , DEVICE_NAME);
-
-	// Initialiser une structure cdev 
-	cdev_init(&my_cdev, &parrot_fops);
-	my_cdev.owner = THIS_MODULE;
-	// Ajouter le périphérique char au système
-	err = cdev_add(&my_cdev, devno, count);
-
-	// Check si il y a une erreur
-	if (err < 0)
-	{
-		printk("Device Add Error\n");
+{	// Enregistrez un numéro majeur pour l'appareil à caractère.
+    if ( register_chrdev(MAJOR_NUM, DEVICE_NAME, &parrot_fops) != 0 ) {
+		printk(KERN_INFO "Error register_chrdev\n");
 		return -1;
 	}
-	
 
-	printk("Execute ceci pour tester :\n");
-	printk("'sudo mknod /dev/nodeParrot c %d 0'\n", MAJOR_NUM);
-	printk("'sudo chmod 666 /dev/nodeParrot'\n");
-	
     buffer_size = 0;
 
     printk(KERN_INFO "Parrot ready!\n");
