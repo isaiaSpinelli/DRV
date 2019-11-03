@@ -102,6 +102,7 @@ watchdog0       253
 
 rtc0            254
 
+**cat /proc/devices**
 
 Le périphérique /dev/ttyUSB0 au majeur 188 correspond lui à un matériel bien réel.
 C’est le convertisseur USB/série de la DE1-SoC, visible sur la machine si le câble USB est branché au connecteur console de la carte.
@@ -211,32 +212,43 @@ Ensuite, j'ai crée un device node adapté au driver parrot et ajouter les droit
 ![image](./img/mknod_nodeTest1.png)
 
 
+Ici on peut observer une lecture sur le device node ainsi qu'une modification de la configuration.
+
 ![image](./img/test_parrot_node.png)
 
+Ensuite, comme demandé, voici le démontage du module.
 
 ![image](./img/rmmod_parrot.png)
 
+Il a fallu créer un lien symbolique du module dans le bon répertoire de /lib/modules afin de pouvoir utiliser modprobe pour le monter.
 
+Voici comment créer le lien:
 ![image](./img/lien_Sym.png)
 
-
-![image](./img/mobprobe.png)
+Vérification du lien:
+![image](./img/ln_parrot.png)
 
 
 Afin que le module se charge automatiquement au démarrage, il faut ajouter celui-ci dans le fichier /etc/modules :
 
 ![image](./img/etc_modules_add_parrot.png)
 
-Voici les logs du kernel au démarrage du système :
+Voici enfin le montage du module avec la commande modprobe :
+![image](./img/mobprobe.png)
 
+Voici les logs du kernel au démarrage du système :
 ![image](./img/dmesg_Demarrage.png)
 
 Remaque: Le premier message signifie que le module n'est pas signé par le fournisseur.
 
 
+Rempalcement de la fonciton register_chrdev() qui ne devrait pas être utilisée à partir du noyau 2.6 par les bons appels à cdev().
 
-Référence : https://gist.github.com/itrobotics/063aea3c72d1f7d7fb94
+Le code final est commenté, il est en annexe (parrot.c)
 
+Référence: https://gist.github.com/itrobotics/063aea3c72d1f7d7fb94
+
+Afin de m'assurer que le module fonctionne encore correctement, j'ai vériifé que le module soit actif et que on pouvait encore lire/ecrire et modifier.
 ![image](./img/check_new.png)
 
 ![image](./img/test_new.png)

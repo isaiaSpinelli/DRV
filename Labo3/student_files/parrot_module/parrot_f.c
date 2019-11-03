@@ -13,7 +13,7 @@
 // DEFINES
 #define MAJOR_NUM       97
 #define MINOR_NUM 		0
-#define MY_DEV_COUNT 	1
+#define MY_DEV_COUNT 	5
 
 #define DEVICE_NAME     "parrot"
 
@@ -26,7 +26,6 @@ char *global_buffer;
 // Donnée venant de l'espace utilisateur
 int buffer_size;
 
-// structure du device 
 struct cdev my_cdev;
 
 /* 
@@ -147,10 +146,7 @@ static int __init parrot_init(void)
 	// Définie le numéro major et mineur
 	devno = MKDEV(MAJOR_NUM, MINOR_NUM);
 	// Enregistre l'appareil à caractère avec un nombre de device max
-	if ( register_chrdev_region(devno, count , DEVICE_NAME)  != 0 ) {
-		printk("register_chrdev_region error\n");
-		return -1;
-	}
+	register_chrdev_region(devno, count , DEVICE_NAME);
 
 	// Initialiser une structure cdev 
 	cdev_init(&my_cdev, &parrot_fops);
@@ -165,13 +161,14 @@ static int __init parrot_init(void)
 		return -1;
 	}
 	
-    buffer_size = 0;
 
-	printk(KERN_INFO "Parrot ready!\n");
 	printk("Execute ceci pour tester :\n");
 	printk("'sudo mknod /dev/nodeParrot c %d 0'\n", MAJOR_NUM);
 	printk("'sudo chmod 666 /dev/nodeParrot'\n");
-    
+	
+    buffer_size = 0;
+
+    printk(KERN_INFO "Parrot ready!\n");
     return 0;
 }
 
@@ -179,18 +176,12 @@ static int __init parrot_init(void)
  * Demonte le module parrot
  */ 
 static void __exit parrot_exit(void)
-{	
-	dev_t devno;
-	// s'il faut, libère le buffer global
+{	// s'il faut, libère le buffer global
     if(global_buffer != 0) {
         kfree(global_buffer);
     }
-   
-	// retirer le device du système
-	devno = MKDEV(MAJOR_NUM, MINOR_NUM);
-	// Annule l'enregistrement du numéro de l'appareil
-	unregister_chrdev_region(devno, MY_DEV_COUNT);
-	cdev_del(&my_cdev);
+    // Annuler l'enregistrement et détruire le device à caractère
+    unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
 
     printk(KERN_INFO "Parrot bye!\n");
 }
