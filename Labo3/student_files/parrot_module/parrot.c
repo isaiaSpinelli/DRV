@@ -57,6 +57,11 @@ static ssize_t parrot_read(struct file *filp, char __user *buf,
     if (*ppos >= buffer_size) {
         return 0;
     }
+    
+    printk("Lecture\n");
+    global_buffer[1] += 1;
+    global_buffer[0] = 73;
+    
 	// Copier le buffer global dans l'espace utilisateur (buf).
     if ( copy_to_user(buf, global_buffer, buffer_size) != 0 ) {
 		return 0;
@@ -86,6 +91,11 @@ static ssize_t parrot_write(struct file *filp, const char __user *buf,
     }
 	// Alloue de la mémoire pour global_buffer
     global_buffer = kmalloc(count+1, GFP_KERNEL);
+    
+    printk("Ecriture de : %s\n", buf);
+    
+    printk("Ecriture 1 : %d-%c\n", buf[0], buf[0]);
+    
 	// Copier un bloc de données à partir de l'espace utilisateur (buf)
 	// dans la mémoire alloué (global buffer)
 	if ( copy_from_user(global_buffer, buf, count) != 0) { 

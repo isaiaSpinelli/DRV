@@ -40,31 +40,50 @@ int unmap_physical (void*, unsigned int);
 
 int main() {
 
-	// used to open /dev/uio1
-	int fd = -1;
 	
 	size_t BUF_SIZE = 128;
-	char * buffWrite = "Salut les amis ! 123";
+	char bufRead[BUF_SIZE] ;
 	
-	char buf[BUF_SIZE]; 
-	
+	char buffWrite[] = "Salut les amis ! 123\n";
+
 	size_t nb =0;
-	
-	void* addr;
+	FILE *ptr = NULL;
 	
 
 	printf("******************************\nExercice ẗest de parrot -- Labo 3\n******************************\n");
 	
-	unsigned char buffer[25];
-	FILE *ptr;
+	int sizeString = strlen(buffWrite);
 
-	ptr = fopen("/dev/nodeParrot","rb"); 
+	// Ouvre le fichier en binaire
+	if ( (ptr = fopen("/dev/nodeParrot","rb+")) == NULL ) {
+		fprintf(stderr,"Error fopen\n(file=%s / line=%d)\n", __FILE__,__LINE__);
+		return EXIT_FAILURE;
+	}
 	
-	fread(buffer, sizeof(buffer), 1, ptr); // read 10 bytes to our buffer
+	fseek(ptr, 0, SEEK_SET);
 	
-	//read(fd, buf, BUF_SIZE);
-
-	printf("lu : %s\n", buffer);
+	
+	// Ecris dans le fichier 
+	nb = fwrite(buffWrite, sizeof(char), sizeString, ptr);
+	if (nb != strlen(buffWrite)) {
+		fprintf(stderr,"Error fopen\n(file=%s / line=%d)\n", __FILE__,__LINE__);
+		fclose(ptr);
+		return EXIT_FAILURE;
+	}
+	
+	//fprintf(ptr, "This is testing for fprintf...\n");
+	//fseek(ptr, 0, SEEK_END);
+	//fputs("This is testing for fputs...\n", ptr);
+	
+	// Lis dans le fichier
+	nb = fread(bufRead, sizeof(char), sizeof(bufRead), ptr);
+	// Si on a bien tous lu (+1 = EOF)
+	if (nb != sizeString+1) {
+		printf("error fread\n");
+	}
+	
+	printf("lu : %s\n", bufRead);
+	
 
 	// Ouvre le fichier /dev/nodeParrot	
 	/*if((fd = open_physical(fd)) == -1)

@@ -13,8 +13,6 @@ Car le paramètre en question n'est pas activé en tant que module donc le noyau
 Mais il est possible de refaire une configuration est de le réacrtiver en module.
 
 
-
-
 ### Revenir à la version non-modifiée du noyau grâce à git:
 - git status
 - git checkout -- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
@@ -60,7 +58,12 @@ Linux de1soclinux 4.14.130-ltsi-13527-g567dd6b26fcf #11 SMP Wed Oct 31 14:40:59 
 
 ### Exercice 2 (ls -al /dev)
 
-Tapez la commande "ls -al /dev" sur votre PC, et essayez de comprendre à quel périphérique chaque fichier que vous voyez est associé.
+Taper la commande "ls -al /dev" sur votre PC, et essayer de comprendre à quel driver chaque fichier que vous voyez est associé.
+
+Voici les différents fichiers dans le dossier /dev. Je les ai donc groupé par numéro majeur afin de comprendre à quel driver ils sont associés.
+
+
+Pour m'aider à trouver le driver associer, j'ai utilisé la commande cat **cat /proc/devices** afin de voir le nom du driver et dans quel mode il fonctionne (char ou bloc).
 
 urandom         1
 zero            1
@@ -68,53 +71,64 @@ full            1
 ram0            1
 mem             1
 kmsg            1
+1 -> mem/ramdisk : Permet d’utiliser la mémoire principale du système en tant que périphérique char(mem) ou bloc(ramdisk).
 
 tty0            4
+1 -> tty : Permet une implémentation général des communications séries.
 
 tty / ttyprintk 5
 console         5
+5 -> tty/console/printk/ptmx(Pseudoterminal) : Permet une implémentation des communications générales.
 
 loop0           7
 vcs             7
+7 -> vcs : Mémoire de console virtuel
 
 sda             8
-
+8 -> sd : Le pilote sd est un périphérique en mode bloc, ce qui signifie qu’il est étroitement associé au sous-système du bloc. Il prend également en charge le concept de partitions.
 
 autofs          10
 cpu_dma_latency 10
 hpet            10
+10 -> misc : Driver par caractère générique. (Drivers divers)
+
 
 sr0             11
+11 -> sr : Driver par bloc utile pour le cdrom
 
 sg0             21
+21 -> sg : Le pilote Linux sg est un pilote de périphérique de sous-système SCSI de niveau supérieur, utilisé principalement pour gérer les périphériques non couverts par les autres pilotes de niveau supérieur(sd,st,sr).
 
 fb0             29
+29 -> fb : Framebuffer permet d'afficher des graphiques sur un système Linux
 
 ppp             108
+108 -> ppp : Pilote générique qui fournit une implémentation du fonctionnalité utile dans toute implémentation de protocole point à point.
 
-ttyUSB0         188
 
 hidraw0         249
+249 -> hidraw : Le pilote hidraw fournit une interface brute aux ports USB et Bluetooth Human Périphériques d'interface (HID).
 
 ptp0            250
+250 -> ptp : Infrastructure d'horloge matérielle pour Linux
 
 watchdog0       253
+253 -> watchdog : Permet d'aider pour l'implémentaion d'un watchdog (circuit matériel qui peut réinitialiser le système informatique en cas de défaillance du logiciel).
 
 rtc0            254
+254 -> rtc : Les horloges temps réel utilise cette API.
 
-**cat /proc/devices**
-
+ttyUSB0         188
 Le périphérique /dev/ttyUSB0 au majeur 188 correspond lui à un matériel bien réel.
 C’est le convertisseur USB/série de la DE1-SoC, visible sur la machine si le câble USB est branché au connecteur console de la carte.
 Pour récupérer plus d’informations sur ce périphérique, les systèmes de fichiers virtuels /proc et /sys sont utiles.
-L’inspection du fichier /proc/devices, listant les périphériques block et char du système, permet de découvrir qu’il s’agit d’un périphérique de type caractère.
 
 
 ### Exercice 3 (mknod)
 
 mknod permet de créer des fichiers spéciaux.
 
-Créez ensuite un fichier virtuel de type caractère avec le même couple majeur/mineur du fichier /dev/random. Qu’est-ce qui se passe lorsque vous lisez son contenu avec la commande cat?
+Créer ensuite un fichier virtuel de type caractère avec le même couple majeur/mineur du fichier /dev/random. Qu’est-ce qui se passe lorsqu'on lit son contenu avec la commande cat?
 
 /dev/random : numéro majeur = 1 / numéro mineur = 8
 
@@ -249,6 +263,7 @@ Le code final est commenté, il est en annexe (parrot.c)
 Référence: https://gist.github.com/itrobotics/063aea3c72d1f7d7fb94
 
 Afin de m'assurer que le module fonctionne encore correctement, j'ai vériifé que le module soit actif et que on pouvait encore lire/ecrire et modifier.
+
 ![image](./img/check_new.png)
 
 ![image](./img/test_new.png)
