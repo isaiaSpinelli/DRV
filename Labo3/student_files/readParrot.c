@@ -29,7 +29,7 @@ int main() {
 
 	
 	size_t BUF_SIZE = 10;
-	
+	// Buffer pour lire le device node
 	char buffRead[] = { 0,0,0,0,0,0,0,0,0,0 } ;
 
 	int fd = -1;
@@ -45,15 +45,15 @@ int main() {
 	if((fd = open_physical(fd)) == -1)
 		return EXIT_FAILURE;
 		
+	// Lis le device node
 	printf("Lecture du fichier /dev/nodeParrot :\n");
-	
-	bytes_read = read(fd, buffRead, BUF_SIZE); 
-	
+	bytes_read = read(fd, buffRead, BUF_SIZE);
+	// Affiche les valeurs lues
 	for( i=0; i<BUF_SIZE; i++) {
 		printf("%c", buffRead[i]);
 	}
 	
-	
+	// Ferme le fichier 
 	close_physical(fd);
 	
 	return EXIT_SUCCESS;

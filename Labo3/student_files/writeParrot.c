@@ -29,8 +29,8 @@ void close_physical (int);
 int main() {
 	int fd = -1;
 	int nb = 0;
-	
-	char buffWrite[] = {0,1,2,3,4,5,6,7,8,9};
+	// Buffer à ecrire
+	char buffWrite[] = {'a','A',3,'9', 7, 'R'};
 	
 	printf("******************************\nExercice write de parrot -- Labo 3\n******************************\n");
 	
@@ -38,15 +38,15 @@ int main() {
 	// Ouvre le fichier /dev/nodeParrot	
 	if((fd = open_physical(fd)) == -1)
 		return EXIT_FAILURE;
-		
-	printf("Ecriture de 0 à 9 en binaire dans /dev/nodeParrot\n");
-	nb = write(fd, buffWrite, strlen(buffWrite)); //sizeof(buffWrite)
+	// write dans le node device
+	printf("Ecriture de aA397R dont 3 et 7 en binaire dans /dev/nodeParrot\n");
+	nb = write(fd, buffWrite, sizeof(buffWrite)); //sizeof(buffWrite)
 	if (nb != sizeof(buffWrite)) {
 		perror("write\n");
 		close(fd);
 		exit(EXIT_FAILURE);
 	}
-	
+	// Ferme le fichier
 	close_physical(fd);
 	
 	return EXIT_SUCCESS;

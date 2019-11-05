@@ -281,9 +281,9 @@ Vérification du bon fonctionnement :
 
 Finalement, il a fallu modifier le module Parrot afin de pouvoir lire/écrire nos chaines de caractères en format binaire. Pour ce faire, j'ai commencé par écrire un logiciel userspace qui permet d'écrire dans le device node en binaire (de 0 à 9 afin de tester toutes la range) qui s'appelle writeParrot que vous pouvez voir un annexe.
 
-Ensuite, j'ai modifié le driver afin de modifier l'écriture de 0 à 9 en binaire en ASCII. 
+Ensuite, j'ai modifié le driver afin de modifier l'écriture de 0 à 9 en binaire en ASCII.
 
-![image](./img/parrot_modif.png)
+![image](./img/parrot_modif.PNG)
 
 
 
@@ -291,12 +291,16 @@ Afin de tester le bon fonctionnement du nouveau driver, j'ai recharger le module
 
 **make -> sudo modprobe -r parrot -> sudo modprobe parrot**
 
-Puis, lancer mon logiciel userspace afin d'écrire en binaire dans le device et lu avec cat pour confirmer les bonnes modifications :
+Puis, lancer mon logiciel userspace afin d'écrire en binaire dans le device et lu avec cat ainsi que le logiciel userspace pour confirmer les bonnes modifications :
 
-![image](./img/write_binaire.png)
+![image](./img/write_read.png)
 
-
+On peut observer que la modification des chiffres en binaire se fait correctement.
 
 Pour le read de parrot, il n'est pas nécessaire de le modifier car tous ce qu'on écrira dans le module via le driver sera déjà convertie en ASCII.
 
-J'ai aussi fait un logiciel userspace readParrot afin de lire le device sans le cat mais aucune modification sur les bytes lus sont nécessaire aire car dit précédemment car tous ce qui à été écris a déjà été convertie.
+
+## Conclusion
+
+Je pense que ca laboratoire est très instructif pour une bonne introdiction aux drivers et modules de linux.
+Par contre, je pense que le temps laissé pour ce laboratoire est relativement court.
