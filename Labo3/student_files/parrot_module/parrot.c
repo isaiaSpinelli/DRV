@@ -49,7 +49,8 @@ void strManip(char *s, int swapLower, int swapUpper)
 */
 static ssize_t parrot_read(struct file *filp, char __user *buf,
             size_t count, loff_t *ppos)
-{	// Test les entrées 
+{	
+	// Test les entrées 
     if (buf == 0 || count < buffer_size) {
         return 0;
     }
@@ -59,13 +60,12 @@ static ssize_t parrot_read(struct file *filp, char __user *buf,
     }
     
     printk("Lecture\n");
-    global_buffer[1] += 1;
-    global_buffer[0] = 73;
     
 	// Copier le buffer global dans l'espace utilisateur (buf).
     if ( copy_to_user(buf, global_buffer, buffer_size) != 0 ) {
 		return 0;
 	}
+	
 	// màj de la position
     *ppos = buffer_size;
 
@@ -78,7 +78,9 @@ static ssize_t parrot_read(struct file *filp, char __user *buf,
  */
 static ssize_t parrot_write(struct file *filp, const char __user *buf,
              size_t count, loff_t *ppos)
-{	// Test les entrées
+{	
+	int i;
+	// Test les entrées
     if (count == 0) {
         return 0;
     }
@@ -91,18 +93,25 @@ static ssize_t parrot_write(struct file *filp, const char __user *buf,
     }
 	// Alloue de la mémoire pour global_buffer
     global_buffer = kmalloc(count+1, GFP_KERNEL);
-    
-    printk("Ecriture de : %s\n", buf);
-    
-    printk("Ecriture 1 : %d-%c\n", buf[0], buf[0]);
+	
+	
     
 	// Copier un bloc de données à partir de l'espace utilisateur (buf)
 	// dans la mémoire alloué (global buffer)
 	if ( copy_from_user(global_buffer, buf, count) != 0) { 
 		return 0;
 	}
+	
+	// Modification de 0 à 9 en binaire pour avoir un caractère de 0 à 9
+    for (i=0; i<count; ++i){
+		if (global_buffer[i] <= 9 ) {
+			global_buffer[i] += 48;
+		}
+	}
     
     global_buffer[count] = '\0';
+    
+    printk("Ecriture %lu - %d\n",count, global_buffer[count] );
 
     buffer_size = count+1;
 
