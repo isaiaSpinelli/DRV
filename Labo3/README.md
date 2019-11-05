@@ -1,16 +1,21 @@
 # Laboratoire 3 DRV
 Spinelli isaia
-30.10.19
+05.11.19
 
-lien : http://reds-lab.einet.ad.eivd.ch/drv_2019/lab_03/lab_03.html
+lien du laboratoire : http://reds-lab.einet.ad.eivd.ch/drv_2019/lab_03/lab_03.html
+
+
+
+[TOC]
+
+
 
 ## Matériel nécessaire
 
 ### Exercice 1
 
-Car je sais pas sinon
-Car le paramètre en question n'est pas activé en tant que module donc le noyau nous empecherait de le charger.
-Mais il est possible de refaire une configuration est de le réacrtiver en module.
+Car le paramètre en question (UIO) n'est pas activé en tant que module donc le noyau nous empêcherait de le charger.
+Mais il est possible de refaire une configuration est de le réactiver en module.
 
 
 ### Revenir à la version non-modifiée du noyau grâce à git:
@@ -65,31 +70,31 @@ Voici les différents fichiers dans le dossier /dev. Je les ai donc groupé par 
 
 Pour m'aider à trouver le driver associer, j'ai utilisé la commande cat **cat /proc/devices** afin de voir le nom du driver et dans quel mode il fonctionne (char ou bloc).
 
-urandom         1
-zero            1
-full            1
-ram0            1
+urandom  	1
+zero           	1
+full          	   1
+ram0             1
 mem             1
-kmsg            1
+kmsg             1
 1 -> mem/ramdisk : Permet d’utiliser la mémoire principale du système en tant que périphérique char(mem) ou bloc(ramdisk).
 
 tty0            4
 1 -> tty : Permet une implémentation général des communications séries.
 
-tty / ttyprintk 5
-console         5
+tty / ttyprintk   5
+console         	5
 5 -> tty/console/printk/ptmx(Pseudoterminal) : Permet une implémentation des communications générales.
 
 loop0           7
-vcs             7
+vcs                7
 7 -> vcs : Mémoire de console virtuel
 
 sda             8
 8 -> sd : Le pilote sd est un périphérique en mode bloc, ce qui signifie qu’il est étroitement associé au sous-système du bloc. Il prend également en charge le concept de partitions.
 
-autofs          10
-cpu_dma_latency 10
-hpet            10
+autofs          			10
+cpu_dma_latency  10
+hpet            			 10
 10 -> misc : Driver par caractère générique. (Drivers divers)
 
 
@@ -138,13 +143,13 @@ sudo mknod test c 1 8
 Lecture du fichier :
 ![image](./img/cat_test_random.png)
 
-On peut voir quand dans les deux cas, des valeurs random sont généré envirion toutes les 4 secondes.
+On peut voir quand dans les deux cas, des valeurs random sont générées environ toutes les 4 secondes. De plus, la lecture du fichier est constante.
 
 
 ### Exercice 4 (proc)
 Retrouvez l'information du périphérique ttyUSB0 de type caractère dans le fichier /proc/devices.
 
-affichier le fichier /proc/devices avec cat:
+afficher le fichier /proc/devices avec cat:
 ![image](./img/ttyUSB-caractere.png)
 
 On peut voir que le périphérique /dev/ttyUSB0 est un périphérique de type caractère.
@@ -152,13 +157,13 @@ On peut voir que le périphérique /dev/ttyUSB0 est un périphérique de type ca
 ### Exercice 5 (sysfs)
 
 sysfs contient davantage d’informations sur le périphérique.
-Retrouvez-le dans l’arborescence de sysfs, en particulier pour ce qui concerne le nom du driver utilisé et le type de connexion.
+Retrouver dans l’arborescence de sysfs, en particulier pour ce qui concerne le nom du driver utilisé et le type de connexion.
 
 ![image](./img/dir-ttyusb.png)
 
 On peut voir que le driver ftdi_sio est utilisé pour ce driver.
 
-Ensuite, utilisez la commande lsmod pour confirmer que le driver utilisé est bien celui individué auparavant, et cherchez si d’autres drivers plus génériques sont impliqués.
+Ensuite, utiliser la commande lsmod pour confirmer que le driver utilisé est bien celui individué auparavant, et cherchez si d’autres drivers plus génériques sont impliqués.
 
 ![image](./img/lsmod.png)
 
@@ -181,12 +186,12 @@ Si vous êtes sous une distribution de type Debian ou dérivée, pour compiler d
 
 ### Exercice 6 (empty module)
 
-Compiler le module empty disponible dans l’archive des sources de ce laboratoire. Ensuite, il faut monter le dans le noyau, le demonter, et analyser les messages enregistrés dans les logs.
+Compiler le module empty disponible dans l’archive des sources de ce laboratoire. Ensuite, il faut monter le dans le noyau, le démonter, et analyser les messages enregistrés dans les logs.
 
-Après avoir un repertoire avec le bon Makefile et le bon chemin jusqu'à la source du noyau et le fichier source de empty, j'ai pu faire un make afin de généré le empty.ko.
-Ensuite, j'ai placé sur empty.ko dans /export/drv afin de le recuperer sur le carte DE1.
+Après avoir un répertoire avec le bon Makefile et le bon chemin jusqu'à la source du noyau et le fichier source de empty, j'ai pu faire un make afin de généré le empty.ko.
+Ensuite, j'ai placé sur empty.ko dans /export/drv afin de le récupérer sur le carte DE1.
 Après, j'ai placé ce module dans Linux_Librairies/drivers pour pouvoir le monter avec insmod.
-Puis, le demonter avec rmmod.
+Puis, le démonter avec rmmod.
 
 ![image](./img/module_monte_demonte.png)
 
@@ -207,7 +212,7 @@ Lorsqu’on désire insérer un module ayant été compilé avec le noyau, la co
 
  ![image](./img/dmesg_parrot.png)
 
-Voici les informations possibles de récupérer sur ce periphérique avec les outils vu precedemment:
+Voici les informations possibles de récupérer sur ce périphérique avec les outils vu précédemment:
 
 Dans /proc/devices :
 ![image](./img/info-parrot.png)
@@ -218,10 +223,10 @@ Avec la commande lsmod :
 Dans /proc/modules:
 ![image](./img/info_parrot_module.png)
 
-Et finallement, dans sys/module :
+Et finalement, dans sys/module :
 ![image](./img/info_parrot_sys_module.png)
 
-Ensuite, j'ai crée un device node adapté au driver parrot et ajouter les droits pour un utilisateur courant puisse y acceder.
+Ensuite, j'ai crée un device node adapté au driver parrot et ajouter les droits pour un utilisateur courant puisse y accéder.
 
 ![image](./img/mknod_nodeTest1.png)
 
@@ -253,17 +258,45 @@ Voici enfin le montage du module avec la commande modprobe :
 Voici les logs du kernel au démarrage du système :
 ![image](./img/dmesg_Demarrage.png)
 
-Remaque: Le premier message signifie que le module n'est pas signé par le fournisseur.
+Remarque: Le premier message signifie que le module n'est pas signé par le fournisseur.
 
 
-Rempalcement de la fonciton register_chrdev() qui ne devrait pas être utilisée à partir du noyau 2.6 par les bons appels à cdev().
+Remplacement de la fonciton register_chrdev() qui ne devrait pas être utilisée à partir du noyau 2.6 par les bons appels à cdev().
 
 Le code final est commenté, il est en annexe (parrot.c)
 
 Référence: https://gist.github.com/itrobotics/063aea3c72d1f7d7fb94
 
-Afin de m'assurer que le module fonctionne encore correctement, j'ai vériifé que le module soit actif et que on pouvait encore lire/ecrire et modifier.
+Afin de m'assurer que le module fonctionne encore correctement, j'ai vérifié que le module soit actif et que on pouvait encore lire/écrire et modifier.
+
+Vérification du module actif :
 
 ![image](./img/check_new.png)
 
+Vérification du bon fonctionnement :
+
 ![image](./img/test_new.png)
+
+
+
+Finalement, il a fallu modifier le module Parrot afin de pouvoir lire/écrire nos chaines de caractères en format binaire. Pour ce faire, j'ai commencé par écrire un logiciel userspace qui permet d'écrire dans le device node en binaire (de 0 à 9 afin de tester toutes la range) qui s'appelle writeParrot que vous pouvez voir un annexe.
+
+Ensuite, j'ai modifié le driver afin de modifier l'écriture de 0 à 9 en binaire en ASCII. 
+
+![image](./img/parrot_modif.png)
+
+
+
+Afin de tester le bon fonctionnement du nouveau driver, j'ai recharger le module en faisant:
+
+**make -> sudo modprobe -r parrot -> sudo modprobe parrot**
+
+Puis, lancer mon logiciel userspace afin d'écrire en binaire dans le device et lu avec cat pour confirmer les bonnes modifications :
+
+![image](./img/write_binaire.png)
+
+
+
+Pour le read de parrot, il n'est pas nécessaire de le modifier car tous ce qu'on écrira dans le module via le driver sera déjà convertie en ASCII.
+
+J'ai aussi fait un logiciel userspace readParrot afin de lire le device sans le cat mais aucune modification sur les bytes lus sont nécessaire aire car dit précédemment car tous ce qui à été écris a déjà été convertie.

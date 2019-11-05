@@ -40,7 +40,7 @@ int main() {
 		return EXIT_FAILURE;
 		
 	printf("Ecriture de 0 à 9 en binaire dans /dev/nodeParrot\n");
-	nb = write(fd, buffWrite, sizeof(buffWrite));
+	nb = write(fd, buffWrite, strlen(buffWrite)); //sizeof(buffWrite)
 	if (nb != sizeof(buffWrite)) {
 		perror("write\n");
 		close(fd);
