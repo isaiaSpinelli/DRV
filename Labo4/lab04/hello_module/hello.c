@@ -11,12 +11,14 @@
 /* For cdev fonctions */
 #include <linux/cdev.h>
 
-#define DEVICE_NAME	"He\tllo"
-#define MAJOR_NUM	100
+/* Constantes */
+#define DEVICE_NAME		"He\tllo"
+#define MAJOR_NUM		100
 #define MINOR_NUM 		0
 #define MY_DEV_COUNT 	1
 
-char *message;
+/* Message et longueur du message à lire (nom du module) */
+char *message ;
 unsigned long msgLength = 0;
 
 /* structure du device */
@@ -43,7 +45,7 @@ hello_read(struct file *filep, char *buffer, size_t count, loff_t *ppos)
 	/* màj de la position */
     *ppos = msgLength;
     
-
+	/* Retourne la longueur du message*/
     return msgLength;
 }
 
@@ -54,7 +56,7 @@ file_operations hello_fops = {
     .read = hello_read
 };
 
-
+/* Fonction pour l'insertion du module */
 static int
 __init hello_init(void)
 {
@@ -83,16 +85,29 @@ __init hello_init(void)
 		return -1;
 	}
 	
+	/* Récupère la longueur du nom du module*/
+	msgLength = strlen(DEVICE_NAME);
 	
-	message = kmalloc(6+1, GFP_KERNEL);
-	// strcpy
-	message = DEVICE_NAME;
+	/* Alloue dynamiquement dans la mémoire du kernel le nombre de char du nom du module + 1 pour le \0 */
+	message = kmalloc(sizeof(char)* msgLength + 1, GFP_KERNEL);
+	/* Si la fonction kmallos a échouée */ 
+	if (message == NULL) {
+        printk(KERN_ERR "Failed to allocate memory for private data!\n");
+		/* Renvoie l'erreur en négatif */
+        rc = -ENOMEM;
+        return rc;
+    }
 	
-    msgLength = strlen(message);
+	/* Copie le nom du device dans le message */
+	strcpy(message, DEVICE_NAME);
+	//message = DEVICE_NAME;
+	
+    
     printk(KERN_INFO "Hello!\nworld\n");
     return 0;
 }
 
+/* Fonction pour la supression du module */
 static void
 __exit hello_exit(void)
 {
@@ -104,16 +119,18 @@ __exit hello_exit(void)
 	unregister_chrdev_region(devno, MY_DEV_COUNT);
 	cdev_del(&my_cdev);
 	
-	// s'il faut, libère le message
-	if(message != 0) {
-        kfree(message);
-    }
+	// Libère la mémoire allouée dynamiquement pour le message
+	kfree(message);
 	
     printk(KERN_INFO "Bye!\n");
 }
 
+/* Déclare l'auteur du module */
 MODULE_AUTHOR("REDS");
+/* Déclare la license du module */
 MODULE_LICENSE("GPL");
 
+/* Définit la fonction à appeler au moment de l'insertion du module ou au démarrage  */
 module_init(hello_init);
+/* Définit la fonction à appeler au moment de la supression du module  */
 module_exit(hello_exit);
