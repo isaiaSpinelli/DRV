@@ -88,22 +88,22 @@ FILE  -> file (FILE vient de la libraire stdio qui ne peut pas êrte utilisé ic
 
 Include <linux/uaccess.h> -> copy_to_user (Il faut inclure uaccess.h pour utiliser copy_to_user)
 
-const char message[] = DEVICE_NAME; -> char * car le 1er arg de copy_to_user doit être un pointeur avec des données non consantes.
+const char message[] = DEVICE_NAME; -> char * car le 1er arg de copy_to_user doit être un pointeur avec des données non constantes.
 
 int* msgLength -> unsigned long car le 3eme arg de copy_to_user prend un unsigned long
 
-file_operations avait plusieurs erreurs, deja il a fallait pas référencer l'adresse de la fonction hello_read. De plus il faut faire coresspondre la prototype de la fonction read à hello_read. Finallement, il faut ajouter un virgule  après THIS_MODULE pour séparer les 2 affectations des champs différents.
+file_operations avait plusieurs erreurs, déjà il a fallait pas référencer l'adresse de la fonction hello_read. De plus il faut faire correspondre la prototype de la fonction read à hello_read. Finallement, il faut ajouter un virgule  après THIS_MODULE pour séparer les 2 affectations des champs différents.
 
 kstrlen n'existe pas, il faut utiliser strlen.
 
-le printk de hello_init 2 arguments avec 2 chaine de caractère. printk prend seulement une chaine de caractère en argument. Donc, il a fallu les concatener ("Hello!\nworld\n"). De plus, le loglevel ne doit pas être séparé par une virgule car printk prend un argument.
+le printk de hello_init 2 arguments avec 2 chaine de caractère. printk prend seulement une chaine de caractère en argument. Donc, il a fallu les concaténer ("Hello!\nworld\n"). De plus, le loglevel ne doit pas être séparé par une virgule car printk prend un argument.
 Il en est de même pour la fonction hello_exit, printk prend qu'un argument.
 
-module_init() et module_exit() prend en paramètre la fonction respective pour initiliser et supprimer le module donc hello_init et hello_exit.
+module_init() et module_exit() prend en paramètre la fonction respective pour initialiser et supprimer le module donc hello_init et hello_exit.
 
 Maintenant le module compile ! =D
 
-Il est donc maintenant possible de compiler / monter et demonter le module :
+Il est donc maintenant possible de compiler / monter et démonter le module :
 
 ![image](./img/E1_test_ins_rm_module.png)
 
@@ -119,7 +119,7 @@ Une fois la fonction read plus correcte, il est maintenant possible de lire le n
 
 ![image](./img/E1_cat_node.png)
 
- Afin de rendre le module plus robuste, je me suis insprié du laboratoire precedent afin de ne plus utiliser la fonction register_chrdev() qui ne devrait pas être utilisée à partir du noyau 2.6.
+ Afin de rendre le module plus robuste, je me suis inspiré du laboratoire précèdent afin de ne plus utiliser la fonction register_chrdev() qui ne devrait pas être utilisée à partir du noyau 2.6.
 
 
 
@@ -128,7 +128,7 @@ Une fois la fonction read plus correcte, il est maintenant possible de lire le n
 Dans l’exercice précédent la mémoire nécessaire pour la chaîne de caractères était allouée statiquement. Il est possible d’allouer dynamiquement de la mémoire dans le noyau à l’aide de fonctions similaires à malloc et free: kmalloc et kfree. Ces fonctions se comportent comme leurs homologues de l’espace utilisateur, hormis le fait que kmalloc est plus finement paramétrable, possédant un argument supplémentaire obligatoire.
 
 **void * kmalloc(size_t size, int flags)**
-- size  = combien de byte de memoire sont nécessaires
+- size  = combien de byte de mémoire sont nécessaires
 - flags = le type de mémoire à allouer
 
 Plus de précision ici : https://www.kernel.org/doc/htmldocs/kernel-api/API-kmalloc.html
@@ -144,7 +144,7 @@ Le but de cet exercice est de remplacer l’allocation statique de la chaîne de
 Dans un module, la mémoire à laquelle nous avons accès est réservée au noyau. Cependant, il s’agit encore, comme dans l’espace utilisateur, de mémoire paginée dans un espace d’adressage virtuel. Si l’on désire accéder à l’adressage physique d’un périphérique, un appel à la fonction ioremap s’avère nécessaire. Cette fonction permet de mapper une intervalle d’adresses physique dans l’espace d’adressage du noyau. Une fois la conversion effectuée, il existe plusieurs fonctions permettant de transférer des données entre les deux domaines: iowrite/ioread pour les types simples, et memcpy_fromio/memcpy_toio pour les tampons en chaînes de caractères.
 
 
-Vous pouvez voir l'allocation dynmaique dans le code hello.c qui est en annexe.
+Vous pouvez voir l'allocation dynamique dans le code hello.c qui est en annexe.
 
 
 ## Interruptions
@@ -185,6 +185,16 @@ Questions spécifiques :
 
 Qu’est-ce que c’est un platform driver ?
 
+Structure permettant de représenter le driver et définir son nom, le propriétaire, les compatibilités, les fonctions probe, remove et toutes autres (shutdown, suspend, suspend_late, resume_early, resume,..).
+
 Comment les informations sont récupérées depuis le device tree ?
 
+Via les fonctions platform_get (platform_get_resource et platform_get_irq) ainsi que la structure platform_device *pdev reçu dans la fonction probe.
+
 Comment les données privées sont traitées/récupérées ?
+
+Elle sont initialisées et récupérée dans la fonction probe via les informations de la dtb et un mappage. Elle sont ensuite récupérer et réutiliser dans la fonction irq_handler via le paramètre dev_id donné dans la fonction probe via la fonction request_irq. Elle sont finalement libérée par la fonction kfree dans la fonction remove.
+
+
+
+Tous le code a été commenté correctement.
