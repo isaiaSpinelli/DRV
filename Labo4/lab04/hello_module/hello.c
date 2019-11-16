@@ -10,10 +10,12 @@
 
 /* For cdev fonctions */
 #include <linux/cdev.h>
+/* for kmalloc */
+#include <linux/slab.h>
 
 /* Constantes */
 #define DEVICE_NAME		"He\tllo"
-#define MAJOR_NUM		100
+#define MAJOR_NUM		98
 #define MINOR_NUM 		0
 #define MY_DEV_COUNT 	1
 
@@ -94,13 +96,11 @@ __init hello_init(void)
 	if (message == NULL) {
         printk(KERN_ERR "Failed to allocate memory for private data!\n");
 		/* Renvoie l'erreur en négatif */
-        rc = -ENOMEM;
-        return rc;
+        return -ENOMEM;
     }
 	
 	/* Copie le nom du device dans le message */
 	strcpy(message, DEVICE_NAME);
-	//message = DEVICE_NAME;
 	
     
     printk(KERN_INFO "Hello!\nworld\n");

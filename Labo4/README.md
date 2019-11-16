@@ -144,7 +144,7 @@ Le but de cet exercice est de remplacer l’allocation statique de la chaîne de
 Dans un module, la mémoire à laquelle nous avons accès est réservée au noyau. Cependant, il s’agit encore, comme dans l’espace utilisateur, de mémoire paginée dans un espace d’adressage virtuel. Si l’on désire accéder à l’adressage physique d’un périphérique, un appel à la fonction ioremap s’avère nécessaire. Cette fonction permet de mapper une intervalle d’adresses physique dans l’espace d’adressage du noyau. Une fois la conversion effectuée, il existe plusieurs fonctions permettant de transférer des données entre les deux domaines: iowrite/ioread pour les types simples, et memcpy_fromio/memcpy_toio pour les tampons en chaînes de caractères.
 
 
-
+Vous pouvez voir l'allocation dynmaique dans le code hello.c qui est en annexe.
 
 
 ## Interruptions
@@ -184,7 +184,6 @@ Comme demandé, j'ai commenté toutes les lignes utiles du code fourni (pushbutt
 Questions spécifiques :
 
 Qu’est-ce que c’est un platform driver ?
-
 
 Comment les informations sont récupérées depuis le device tree ?
 

@@ -19,13 +19,17 @@ MODULE_AUTHOR("REDS");
 /* Indique une description du module*/
 MODULE_DESCRIPTION("Pushbutton example");
 
-/* Structure permettant de mémoriser */
+/* Structure permettant de mémoriser les informations importantes du module */
 struct priv
-{
+{	/* Pointeur sur les leds */
     volatile int *LED_ptr;
+    /* Pointeur sur les boutons */
     volatile int *KEY_ptr;
+    /* Pointeur sur la base de la mémoire du module*/
     void *MEM_ptr;
+    /*  */
     struct resource *MEM_info;
+    /* Numéro d'interruption du module */
     int IRQ_num;
 };
 
