@@ -27,6 +27,7 @@ arm-linux-gnueabihf-gcc Ex3.c -o Ex3
 sudo cp Ex3 /export/drv/
 
 (DE1) ./Ex3
+(DE1) sudo insmod /rmmod / dmesg / 
 
 ## rendu
 
