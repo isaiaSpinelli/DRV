@@ -1,3 +1,12 @@
+/*
+ * Auteurs : Spinelli Isaia
+ * Date : 27.11.19
+ * 
+ * Amelioration : devm_kmalloc()
+ * 
+ */
+ 
+ 
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -22,7 +31,7 @@ MODULE_LICENSE("GPL");
 /* Déclare l'auteur du module */
 MODULE_AUTHOR("REDS_spinelli");
 /* Indique une description du module*/
-MODULE_DESCRIPTION("Utiliser les afficheurs 7-segments pour afficher un compte a rebours");
+MODULE_DESCRIPTION("afficher un compte à rebours sur les afficheurs 7-segments");
 
 /* Constantes */
 #define DEVICE_NAME		"CompteRebours"
@@ -30,23 +39,111 @@ MODULE_DESCRIPTION("Utiliser les afficheurs 7-segments pour afficher un compte a
 #define MINOR_NUM 		0
 #define MY_DEV_COUNT 	1
 
+/* Tmpes initial en seconde du chrono */
+#define TEMPS_INIT_SEC 	65
+
 /* structure du device */
 struct cdev my_cdev;
 
+/* Structure pour le timer*/
+static struct timer_list my_timer;
+
+/* Temps initial du chrono en seconde */
+unsigned long temps_init;
+/* Valeur du chronomètre */
+unsigned long compteur_chrono ;
+
+void my_timer_callback( unsigned long data )
+{
+	int rc = -1;
+	
+	printk( "my_timer_callback called (%ld).\n", jiffies );
+	rc = mod_timer( &my_timer, jiffies + msecs_to_jiffies(1000) );
+	if (rc) printk("Error in mod_timer\n");
+	//compteur_chrono--;
+}
+
+
+
+
+/* Une lecture permettra de récupérer le temps écoulé dans l’espace utilisateur */
 static ssize_t
 compte_read(struct file *filp, char __user *buf,
             size_t count, loff_t *ppos)
 {
+	
+	char TempsEcouleStr[128] = "";
+	/* Calcul le temps ecoulé */
+	long temps_ecoule ; 
+	
+	/* Si on vient de lire la valeur */
+	if (*ppos > 0) {
+		*ppos = 0;
+        return 0;
+    }
+	
+	temps_ecoule = temps_init - compteur_chrono;
+	
 
-
-    return 0;
+	/* Transforme en string le temps écoulé */
+	sprintf(TempsEcouleStr, "%lu", temps_ecoule);
+	/*
+	if ( (rc = kstrtol(TempsEcouleStr, DECIMAL, &temps_ecoule)) != 0)
+		return -rc;
+	*/
+	
+	/* Copie le temps écoulé en string dans le buf dans l'espace user */
+	if ( copy_to_user(buf, TempsEcouleStr, sizeof(TempsEcouleStr)) != 0 ) {
+		return 0;
+	}
+	
+	// màj de la position
+    *ppos = sizeof(TempsEcouleStr);
+	
+	compteur_chrono--;
+	
+    return 6;
 }
 
+/* Une écriture sur le device node associé permettra de choisir un temps initial (en secondes) */
 static ssize_t
 compte_write(struct file *filp, const char __user *buf,
              size_t count, loff_t *ppos)
 {
-    return 0;
+	const int DECIMAL = 10;
+	char * temps_init_str;
+	unsigned long temps_init_s = 5;
+	int rc = -1;
+	
+	// Test les entrées
+    if (count == 0) {
+        return 0;
+    }
+	
+	// Alloue de la mémoire pour kernel_buffer
+    temps_init_str = kmalloc(count+1, GFP_KERNEL);
+    
+    // Copier un bloc de données à partir de l'espace utilisateur (buf)
+	// dans la mémoire alloué ( kernel_buffer)
+	if ( copy_from_user(temps_init_str, buf, count) != 0) { 
+		return 0;
+	}
+	
+	temps_init_str[count] = '\0';
+	
+	/* Transforme le string en unsigned long pour le temps inital */
+	if ( (rc = kstrtoul(temps_init_str, DECIMAL, &temps_init_s)) != 0) {
+		printk(KERN_ERR "\nrecu : %lu\n", temps_init_s);
+		return -rc;
+	}
+		
+		
+	/* Met à jour le temps initial en seconde recu par une écriture dans le node du module*/
+	temps_init = temps_init_s;
+	
+	printk(KERN_DEBUG "%s\n", temps_init_str);
+	
+    return count;
 }
 
 
@@ -86,8 +183,9 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 		
 		/* Clear l'interruption du bouton */
 		*(priv->KEY_ptr + 3) = 0x8;
-	} else if (valKey == 1) { /* Pression sur le bouton droite (reinitialise le compteur a sa valeur initiale) */
-		
+	} else if (valKey == 1) { /* Pression sur le bouton droite  */
+		/* réinitialiser le compteur à sa valeur initiale */
+		compteur_chrono = temps_init;
 		/* Clear l'interruption du bouton */
 		*(priv->KEY_ptr + 3) = 0x1;
 	} else { 
@@ -137,6 +235,10 @@ static int compte_probe(struct platform_device *pdev)
 		printk(KERN_ERR "Device Add Error\n");
 		goto cdev_add_fail;
 	}
+	
+	printk(KERN_INFO "Execute ceci pour tester :\n");
+	printk(KERN_INFO "sudo mknod /dev/nodeCompte c %d 0 \n", MAJOR_NUM);
+	printk(KERN_INFO "sudo chmod 666 /dev/nodeCompte\n");
     
     
     
@@ -212,7 +314,7 @@ static int compte_probe(struct platform_device *pdev)
                      "pushbutton_irq_handler",
 					 /* Pointeur sur la structure d'information du module qui sera utilisée dans le handler */
                      (void *) priv);
-	/* Si la la fonction request_irq() à echoué */
+	/* Si la fonction request_irq() à echoué */
     if (rc != 0) {
         printk(KERN_ERR "pushbutton_irq_handler: cannot register IRQ %d\n",
                priv->IRQ_num);
@@ -222,11 +324,31 @@ static int compte_probe(struct platform_device *pdev)
     }
 
     printk(KERN_INFO "Interrupt registered!\n");
+    
+    /* Init des variables du chrono */
+    temps_init = TEMPS_INIT_SEC;
+    compteur_chrono = temps_init;
+    
+    printk(KERN_INFO "Timer module installing\n");
+
+	/* Initilisation du timer (periode = 1 secondes) */
+	setup_timer( &my_timer, my_timer_callback, 0 );
+	rc = mod_timer( &my_timer, jiffies + msecs_to_jiffies(1000) );
+	/* Si l'init du timer échoue */
+    if (rc != 0) {
+        printk(KERN_ERR "Init timer failed\n");
+        printk(KERN_ERR "error code: %d\n", rc);
+		/* Fin de la fonction avec un démappage des adresse, un free de la structure priv et le retour de l'erreur */
+        goto init_timer_fail;
+    }
+    
+    
     printk(KERN_INFO "Driver ready!\n");
 	/* Retourne 0 si la fonction probe c'est correctement effectué */
     return 0;
 
 /* Déclaration de labels afin de gérer toutes les erreurs possibles de la fonction probe ci-dessus */
+ init_timer_fail:
  request_irq_fail:
  get_irq_fail:
 	/* Démappage de l'adresse virtuelle */
@@ -249,9 +371,15 @@ static int compte_remove(struct platform_device *pdev)
 
     printk(KERN_INFO "Removing driver...\n");
     
-    
+    int rc;
     
     dev_t devno;
+    
+    rc = del_timer( &my_timer );
+	if (rc != 0) 
+		printk(KERN_ERR "delete timer failed ! \n");
+
+
 	
 	/* Retirer le device du système */
 	devno = MKDEV(MAJOR_NUM, MINOR_NUM);

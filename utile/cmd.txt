@@ -33,3 +33,11 @@ sudo cp Ex3 /export/drv/
 
 tar -czvf file.tar.gz directory
 
+insmod 
+rmmod 
+
+dmesg | tail
+sudo mknod /dev/nodeCompte c 100 0
+sudo chmod 666 /dev/nodeCompte
+cat /dev/
+echo "" > /dev/
