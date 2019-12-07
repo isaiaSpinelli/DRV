@@ -1,6 +1,6 @@
 /*
  * Auteurs : Spinelli Isaia
- * Date : 27.11.19
+ * Date : 07.12.19
  * 
  * 
  */
@@ -25,6 +25,9 @@
 /* For cdev fonctions */
 #include <linux/cdev.h>
 
+#include <linux/kfifo.h>
+
+
 /* Déclare la license du module */
 MODULE_LICENSE("GPL");
 /* Déclare l'auteur du module */
@@ -40,8 +43,20 @@ MODULE_DESCRIPTION("Maintien une kfifo avec des nombres premiers");
 #define MINOR_NUM 		0
 #define MY_DEV_COUNT 	1
 
+/* Delcare la kfifo */
+static DECLARE_KFIFO_PTR(my_kfifo, int);
+/* Init le nombre de nombre premier dans la kfifo*/
 static unsigned int N = 50;
 
+/* Tableau des 50 premiers nombres premiers */
+static const int NOMBRES_PREMIER[] = {
+	 2,  3,  5, 7, 11, 13, 17, 19, 23, 29,
+	 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 
+	 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 
+	 127,131, 137, 139, 149, 151, 157, 163, 167, 173,
+	179, 181, 191, 193, 197, 199, 211, 223, 227, 229
+};
+/* Permet de récupèrer un paramètre lors de l'insertion du module */
 module_param(N, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(N, "Les premiers N nombres premiers (N <= 50)");
 
@@ -53,7 +68,13 @@ struct priv
 
 };
 
-
+/* Remplie la fifo avec les nombres premiers souhaités */
+void fill_kfifo(unsigned int NB){
+	int i;
+	for (i = 0; i < NB; i++){
+		kfifo_put(&my_kfifo, NOMBRES_PREMIER[i]);
+	}
+}
 
 static int kfifo_open(struct inode* node, struct file * f)
 {
@@ -67,13 +88,15 @@ static int kfifo_open(struct inode* node, struct file * f)
 	
 }
 
-
-
-/* Une lecture permettra de récupérer le temps écoulé dans l’espace utilisateur */
+/* Une lecture permettra de récupérer le nombre premier dans la kfifo*/
 static ssize_t
 kfifo_read(struct file *filp, char __user *buf,
             size_t count, loff_t *ppos)
 {
+	int rc = -1;
+	int nombre_premier[1];
+	char nb_premier_str[4] = "";
+	
     struct priv *priv_s ;
 	/* Récupération des informations du module (structure privée) */
 	priv_s = (struct priv *) filp->private_data;
@@ -89,22 +112,35 @@ kfifo_read(struct file *filp, char __user *buf,
         return 0;
     }
 	
+	/* Récuère le nombre premier suivant dans la kfifo*/
+	rc = kfifo_out(&my_kfifo, nombre_premier, 1);
 	
+	/* Transforme en string le nombre premier */
+	sprintf(nb_premier_str, "%u", nombre_premier[0]);
 	
+	/* Copie nombre premier en string dans le buf dans l'espace user */
+	if ( copy_to_user(buf, nb_premier_str, sizeof(nb_premier_str)) != 0 ) {
+		return 0;
+	}
 	
+	/* Si la kfifo est vide, la remplie*/
+	if (kfifo_is_empty(&my_kfifo)) {
+		fill_kfifo(N);
+	}
 	
 	// màj de la position
+	*ppos = sizeof(nb_premier_str);
 	
     return *ppos;
 }
 
-/* Une écriture sur le device node associé permettra de choisir un temps initial (en secondes) */
+/*
 static ssize_t
 kfifo_write(struct file *filp, const char __user *buf,
              size_t count, loff_t *ppos)
 {
 	struct priv *priv_s ;
-	/* Récupération des informations du module (structure privée) */
+
 	priv_s = (struct priv *) filp->private_data;
 	
 	// Test les entrées
@@ -115,6 +151,7 @@ kfifo_write(struct file *filp, const char __user *buf,
 	
     return count;
 }
+*/
 
 
 
@@ -123,7 +160,7 @@ file_operations compte_fops = {
     .owner         = THIS_MODULE,
     .read          = kfifo_read,
     .open          = kfifo_open,
-    .write         = kfifo_write,
+//    .write         = kfifo_write,
 };
 
 
@@ -133,6 +170,7 @@ static int kfifo_probe(struct platform_device *pdev)
     struct priv *priv;
 	/* Valeur de retour */
     int rc;
+    int i;
     
     dev_t devno;
 	unsigned int count = MY_DEV_COUNT;
@@ -184,17 +222,27 @@ static int kfifo_probe(struct platform_device *pdev)
 	}
 	printk(KERN_INFO "N = %d\n", N);
     
-    
- 
 
     /* Init la kfifo */
+    rc = kfifo_alloc(&my_kfifo, N, GFP_KERNEL);
+	if (rc) {
+		rc = -rc;
+		printk(KERN_ERR "error kfifo_alloc (%d)\n", rc);
+		goto kfifo_alloc_fail;
+	}
     
-    
+    /* Remplie la fifo avec les nombres premiers souhaités */
+	for (i = 0; i < N; i++){
+		kfifo_put(&my_kfifo, NOMBRES_PREMIER[i]);
+	}
+
+
     printk(KERN_INFO "Driver ready!\n");
 	/* Retourne 0 si la fonction probe c'est correctement effectué */
     return 0;
 
 /* Déclaration de labels afin de gérer toutes les erreurs possibles de la fonction probe ci-dessus */
+ kfifo_alloc_fail:
  register_chrdev_region_fail:
  cdev_add_fail:
 	/* Libère la mémoire alloué */
@@ -214,6 +262,9 @@ static int kfifo_remove(struct platform_device *pdev)
 
     printk(KERN_INFO "Removing driver...\n");
     
+    /* Libre la kfifo allouée */
+    kfifo_free(&my_kfifo);
+    
 	
 	/* Retirer le device du système */
 	devno = MKDEV(MAJOR_NUM, MINOR_NUM);
@@ -229,22 +280,22 @@ static int kfifo_remove(struct platform_device *pdev)
 }
 
 /* Tableau de structure of_device_id qui permet de déclarer les compatibiltés des périphériques gérés par ce module */
-static const struct of_device_id pushbutton_driver_id[] = {
+static const struct of_device_id kfifo_driver_id[] = {
 	/* Déclare la compatibilité du périphérique géré par ce module */
     { .compatible = "drv" },
     { /* END */ },
 };
 
 /* Cette macro décrit les périphériques que le module peut prendre en charge (recherche de la dtb)*/
-MODULE_DEVICE_TABLE(of, pushbutton_driver_id);
+MODULE_DEVICE_TABLE(of, kfifo_driver_id);
 
 /* Structure permettant  de représenter le driver */
-static struct platform_driver pushbutton_driver = {
+static struct platform_driver kfifo_driver = {
 	/* Déclare le nom, le module et la table des compatibilités du module*/
     .driver = {
         .name = "drv-lab4",
         .owner = THIS_MODULE,
-        .of_match_table = of_match_ptr(pushbutton_driver_id),
+        .of_match_table = of_match_ptr(kfifo_driver_id),
     },
 	/* Définit la fonction probe appelée lors du branchement d'un préiphérique pris en charge par ce module */
     .probe = kfifo_probe,
@@ -254,4 +305,4 @@ static struct platform_driver pushbutton_driver = {
 
 /* Macro d'assistance pour les pilotes qui ne font rien de spécial dans les fonctions init / exit. Permet d'éliminer du code (fonction init et exit) */
 /* Enregistre le driver via la structure ci-dessus */
-module_platform_driver(pushbutton_driver);
+module_platform_driver(kfifo_driver);
