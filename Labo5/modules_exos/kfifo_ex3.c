@@ -71,7 +71,7 @@ struct priv
 /* Remplie la fifo avec les nombres premiers souhaités */
 void fill_kfifo(unsigned int NB){
 	int i;
-	for (i = 0; i < NB; i++){
+	for (i = NB-1; i >= 0; i--){
 		kfifo_put(&my_kfifo, NOMBRES_PREMIER[i]);
 	}
 }
@@ -224,7 +224,6 @@ static int kfifo_probe(struct platform_device *pdev)
     struct priv *priv;
 	/* Valeur de retour */
     int rc;
-    int i;
     
     dev_t devno;
 	unsigned int count = MY_DEV_COUNT;
@@ -286,9 +285,11 @@ static int kfifo_probe(struct platform_device *pdev)
 	}
     
     /* Remplie la fifo avec les nombres premiers souhaités */
+    fill_kfifo(N);
+    /*
 	for (i = 0; i < N; i++){
 		kfifo_put(&my_kfifo, NOMBRES_PREMIER[i]);
-	}
+	}*/
 	
 	/* Crée un objet dans /sys/kernel */
 	example_kobj = kobject_create_and_add("kobject_example", kernel_kobj);
