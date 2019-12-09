@@ -4,6 +4,9 @@ Début : 20.11.19
 
 lien du laboratoire : http://reds-lab.einet.ad.eivd.ch/drv_2019/lab_05/lab_05.html#
 
+gloable ex3 ? (kset ?)
+read Count ??
+
 ## Objectifs
 
 - Savoir gérer threads, timers et interruptions en kernel-space
@@ -55,7 +58,9 @@ http://www.tldp.org/LDP/lkmpg/2.6/html/x323.html et ici : https://www.linux.com/
 
 Ensuite, à chaque lecture du device node correspondant au module, le driver doit retourner un à la fois ces nombres, en boucle (c.a.d., il va retourner un nombre pour chaque lecture qu’on fait depuis le device, et une fois arrivé au N-ième nombre il doit recommencer du premier) du plus grand au plus petit.
 
-Le code est en annexe (kfifo_module.c).
+Le code est en annexe (kfifo_ex2.c).
+
+Remarque: Pour cette excercie, je n'avais pas bien lu la consigne. De ce fait, la kfifo se vide du plus petit au plus grand. La correction à cet exercice est faite dans le prochain exercice (Exercice 3)
 
 ## Symboles exportés
 
@@ -80,7 +85,7 @@ Le but est de modifier le code de l’exercice précédent pour que le module so
 - Afficher le numéro d’appels à read effectués jusqu’à présent.
 - Afficher le numéro qui sera retourné par le prochain appel à read (sans le sortir de la queue).
 
-Le code est en annexe (kfifo_module.c).
+Le code est en annexe (kfifo_ex3.c).
 
 ## Synchronisation
 
@@ -97,9 +102,11 @@ Le but est de reprendre l’exemple pushbutton_example du laboratoire 4 et d'y a
 
 Qu’est-ce que pourriez-vous utiliser pour gérer les problèmes de concurrence ?
 
-synchronisation basée sur des variables atomiques.
 
-Le code est en annexe (pushbutton_example1.c).
+
+Finalement, comme demandé la synchronisation à été basée sur des variables atomiques.
+
+Le code est en annexe (Synch_Ex4.c).
 
 ### Exercice 5 synchronisation (II)
 
@@ -110,4 +117,4 @@ Est-ce que vos alternatives pour la gestion de la concurrence ont changé ? Pour
 
 méthode de synchronisation différente de celle utilisée dans l’exercice 4.
 
-Le code est en annexe (pushbutton_example2.c).
+Le code est en annexe (Synch_Ex4.c).

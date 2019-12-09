@@ -2,7 +2,7 @@
  * Auteurs : Spinelli Isaia
  * Date : 07.12.19
  * 
- * 
+ * Remarque: Il serait surment préférable d'utilliser un kset 
  */
  
  
@@ -31,22 +31,26 @@
 /* Déclare la license du module */
 MODULE_LICENSE("GPL");
 /* Déclare l'auteur du module */
-MODULE_AUTHOR("REDS_spinelli");
+MODULE_AUTHOR("REDS_Spinelli");
 /* Indique une description du module*/
 MODULE_DESCRIPTION("Maintien une kfifo avec des nombres premiers");
 
 /* CONSTANTES */
 
 /* Constantes pour le device char */
-#define DEVICE_NAME		"Kfifo_ex2"
+#define DEVICE_NAME		"Kfifo_ex3"
 #define MAJOR_NUM		101
 #define MINOR_NUM 		0
 #define MY_DEV_COUNT 	1
+
+static struct kobject *kobj_Kfifo_ex3;
 
 /* Delcare la kfifo */
 static DECLARE_KFIFO_PTR(my_kfifo, int);
 /* Init le nombre de nombre premier dans la kfifo*/
 static unsigned int N = 50;
+/* Count le nombre de read */
+static unsigned int countRead = 0;
 
 /* Tableau des 50 premiers nombres premiers */
 static const int NOMBRES_PREMIER[] = {
@@ -114,6 +118,7 @@ kfifo_read(struct file *filp, char __user *buf,
 	
 	/* Récuère le nombre premier suivant dans la kfifo*/
 	rc = kfifo_out(&my_kfifo, nombre_premier, 1);
+	countRead++;
 	
 	/* Transforme en string le nombre premier */
 	sprintf(nb_premier_str, "%u", nombre_premier[0]);
@@ -164,15 +169,30 @@ file_operations compte_fops = {
 };
 
 /*
- * Fonction appellée lors de le lecture de l'objet N dans /sys/kernel/kfifo_ex3_N
+ * Fonction appellée lors de le lecture d'un paramètre dans /sys/kernel/kfifo_ex3_N
  */
-static ssize_t foo_show(struct kobject *kobj, struct kobj_attribute *attr,
+static ssize_t kobject_show(struct kobject *kobj, struct kobj_attribute *attr,
 			char *buf)
 {
-	return sprintf(buf, "%d\n", N);
-}
+	int var ;
 
-static ssize_t foo_store(struct kobject *kobj, struct kobj_attribute *attr,
+	/* Renvoie l'attribut souhaité en fonction du fichier lu */
+	if (strcmp(attr->attr.name, "N") == 0)
+		var = N;
+	else if (strcmp(attr->attr.name, "countRead") == 0)
+		var = countRead; // N - kfifo_len(&my_kfifo) ;
+	else {
+		/* Lis le prochain element de la kfifi sans la supprimer */
+		if ( kfifo_peek(&my_kfifo, &var) == 0 ) {
+			/* Si elle est vide (ne devrait pas arriver) remplie la kfifo*/
+			fill_kfifo(N);
+		}
+	}
+		
+	return sprintf(buf, "%d\n", var);
+}
+/* Lors d'une modification de N via le /sys */
+static ssize_t N_store(struct kobject *kobj, struct kobj_attribute *attr,
 			 const char *buf, size_t count)
 {
 	int rc;
@@ -185,6 +205,11 @@ static ssize_t foo_store(struct kobject *kobj, struct kobj_attribute *attr,
 	}
 	N = newVal;
 	/* Met à jour la kfifo en fonction de la nouvelle valeur et de la position dans la kfifo */
+	if (kfifo_len(&my_kfifo) > newVal ) {
+		kfifo_reset(&my_kfifo);
+		fill_kfifo(N);
+	}
+	
 	
 	if (rc < 0)
 		return rc;
@@ -192,17 +217,27 @@ static ssize_t foo_store(struct kobject *kobj, struct kobj_attribute *attr,
 	return count;
 }
 
-/* Sysfs attributes cannot be world-writable. */
-static struct kobj_attribute foo_attribute =
-	__ATTR(foo, 0664, foo_show, foo_store);
+/* attribut pour lire et modifier N */
+static struct kobj_attribute N_attribute =
+	__ATTR(N, 0664, kobject_show, N_store);
+	
+/* attribut pour lire le nombre de read */
+static struct kobj_attribute countRead_attribute =
+	__ATTR(countRead, 0444, kobject_show, N_store);
+	
+/* attribut pour voir le prochain nombre premier */
+static struct kobj_attribute Next_attribute =
+	__ATTR(Next, 0444, kobject_show, N_store);
 	
 	
 /*
- * Create a group of attributes so that we can create and destroy them all
- * at once.
+ * Créez un groupe d'attributs afin que nous puissions les créer et 
+ * les détruire tous en même temps.
  */
 static struct attribute *attrs[] = {
-	&foo_attribute.attr,
+	&N_attribute.attr,
+	&countRead_attribute.attr,
+	&Next_attribute.attr,
 	NULL,	/* need to NULL terminate the list of attributes */
 };
 
@@ -216,7 +251,7 @@ static struct attribute_group attr_group = {
 	.attrs = attrs,
 };
 
-static struct kobject *example_kobj;
+
 
 /* Fonction probe appelée lors du branchement du périphérique (pdev est un poiteur sur une structure contenant toutes les informations du device détécté) */
 static int kfifo_probe(struct platform_device *pdev)
@@ -286,24 +321,21 @@ static int kfifo_probe(struct platform_device *pdev)
     
     /* Remplie la fifo avec les nombres premiers souhaités */
     fill_kfifo(N);
-    /*
-	for (i = 0; i < N; i++){
-		kfifo_put(&my_kfifo, NOMBRES_PREMIER[i]);
-	}*/
-	
+
 	/* Crée un objet dans /sys/kernel */
-	example_kobj = kobject_create_and_add("kobject_example", kernel_kobj);
-	if (!example_kobj) {
+	kobj_Kfifo_ex3 = kobject_create_and_add("Kfifo_ex3", kernel_kobj);
+	if (!kobj_Kfifo_ex3) {
 		rc = -ENOMEM;
 		printk(KERN_ERR "error kobject_create_and_add (%d)\n", rc);
 		goto kobject_create_fail;
 	}
 		
 
-	/* crée le fichier associé avec le kobjet  (kset ?) */
-	rc = sysfs_create_group(example_kobj, &attr_group);
-	if (rc)
-		kobject_put(example_kobj);
+	/* crée le fichier associé avec le kobjet */
+	rc = sysfs_create_group(kobj_Kfifo_ex3, &attr_group); 
+	if (rc) {
+		kobject_put(kobj_Kfifo_ex3);
+	}
 
 
     printk(KERN_INFO "Driver ready!\n");
@@ -333,10 +365,8 @@ static int kfifo_remove(struct platform_device *pdev)
 
     printk(KERN_INFO "Removing driver...\n");
     
-    
-    
 	/* Retire l'object precedement crée */
-    kobject_put(example_kobj);
+    kobject_put(kobj_Kfifo_ex3);
     
     /* retire la kfifo allouée */
     kfifo_free(&my_kfifo);
