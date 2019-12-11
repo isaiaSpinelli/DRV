@@ -21,6 +21,8 @@
 
 /* Permet de créer un dossier dans le sysfs */
 static struct kobject *kobj_Synch_ex5;
+/* spinlock permettant de protéger la variable shared_var */
+static spinlock_t lock_shared_var;
 
 /* Déclare la license du module */
 MODULE_LICENSE("GPL");
@@ -30,7 +32,7 @@ MODULE_AUTHOR("REDS_Spinelli");
 MODULE_DESCRIPTION("Exercice 4 de Synchronisation");
 
 /* Variable entière paratgée init à 7 */
-atomic_t shared_var = ATOMIC_INIT(7);
+static int shared_var = 7;
 
 /* Structure permettant de mémoriser les informations importantes du module */
 struct priv
@@ -49,11 +51,15 @@ struct priv
 
 /* Fonction de handler appelée lors d'une interruption  */
 irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
-{	/* Récupération des informations du module préparées dans le fonction probe (request_irq) */
+{	
+	unsigned long flags;
+	/* Récupération des informations du module préparées dans le fonction probe (request_irq) */
     struct priv *priv = (struct priv *) dev_id;
 	
 	/* Incrémente la variable partagée à chaque fois qu'un bouton est pressé */
-	atomic_inc(&shared_var);
+	spin_lock_irqsave(&lock_shared_var, flags);
+	shared_var++;
+	spin_unlock_irqrestore(&lock_shared_var, flags);
 	
     printk(KERN_NOTICE "Button pushed!\n");
 	/* Incrémentation des leds */
@@ -71,23 +77,34 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
  */
 static ssize_t shared_var_show(struct kobject *kobj, struct kobj_attribute *attr,
 			char *buf)
-{	/* Renvoie en string la valeur de shared_var */
-	return sprintf(buf, "%d\n", atomic_read(&shared_var));
+{	
+	unsigned long flags;
+	int rc = -1;
+	/* Permet de lock pour lire la variable partagé*/ // read_lock_irqsave(&xxx_lock, flags);
+	spin_lock_irqsave(&lock_shared_var, flags);
+	/* Place dans le buf la valeur de shared_var */
+	rc = sprintf(buf, "%d\n", shared_var);
+	spin_unlock_irqrestore(&lock_shared_var, flags);
+	
+	return rc; 
 }
 
 /* Lors d'une addition de shared_var via une ecriture dans /sys/kernel/Synch_ex5/add_qty */
 static ssize_t add_qty_store(struct kobject *kobj, struct kobj_attribute *attr,
 			 const char *buf, size_t count)
-{
+{	
+	unsigned long flags;
 	int rc;
 	int addVal ;
 	/* Récupére la valeur à ajouter*/
 	rc = kstrtoint(buf, 10, &addVal);
 	if (rc < 0)
 		return rc;
-
-	/* Additionne de manière atomique shared_var avec la valeur écrite*/
-	atomic_add(addVal, &shared_var);
+	
+	/* Additionne la variable shared_var avec la valeur écrite*/
+	spin_lock_irqsave(&lock_shared_var, flags);
+	shared_var += addVal;
+	spin_unlock_irqrestore(&lock_shared_var, flags);
 
 	return count;
 }
@@ -95,8 +112,13 @@ static ssize_t add_qty_store(struct kobject *kobj, struct kobj_attribute *attr,
 /* Lors d'une decrémenter de shared_var via une ecriture dans /sys/kernel/Synch_ex5/decr */
 static ssize_t decr_store(struct kobject *kobj, struct kobj_attribute *attr,
 			 const char *buf, size_t count)
-{	/* Decrémente de manière atomique shared_var */
-	atomic_dec(&shared_var);
+{	
+	unsigned long flags;
+	/* Decrémente la variable shared_var */
+	spin_lock_irqsave(&lock_shared_var, flags);
+	shared_var--;
+	spin_unlock_irqrestore(&lock_shared_var, flags);
+	
 	return count;
 }
 
@@ -233,6 +255,9 @@ static int pushbutton_probe(struct platform_device *pdev)
 	if (rc) {
 		kobject_put(kobj_Synch_ex5);
 	}
+	
+	
+	spin_lock_init(&lock_shared_var);
 
     printk(KERN_INFO "Interrupt registered!\n");
     printk(KERN_INFO "Driver ready!\n");
