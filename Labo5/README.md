@@ -102,9 +102,39 @@ Le but est de reprendre l’exemple pushbutton_example du laboratoire 4 et d'y a
 
 Qu’est-ce que pourriez-vous utiliser pour gérer les problèmes de concurrence ?
 
+Comme vu en cours, il y a essentiellement 3 méthodes pour gérer les problèmes de concurrence :
+
+- les mutex
+- les Spinlock
+- Algorithmes sans verrouillage (Ex : RCU)
+- les variables atomiques
+
+Le mutex est la principal métode de verrouillage. Ils permettent de faire une demande pour avoir un accès unique sur la ressource. Si la ressource est déjà utilisée, le processus est bloqué. Il faut donc être dans un contexte où le "sommeil" est autorisé.
+
+Le Spinlock est principalement utilisé lors de contexte où le "sommeil" :
+- n'est pas autorisé (Ex: gestionnaires d'interruption)
+- n'est pas souhaité (Ex: section critique)
+
+Il est souvent utilisé pour les multiprocesseurs. Contrairement aux mutex, il fait de l'attente active jusqu'à ce que le verrou soit disponible. Il désactive la préemption sur le processeur sur lequel il s'execute.
+
+Si les Spinlock ont de trop fort effet négatif sur la performance du système, il est possible d'utiliser des algorithmes sans verrouillage comme RCU ( Read Copy Update).
+API RCU disponible ici : http://en.wikipedia.org/wiki/RCU
+
+Finalement, quand c'est disponible ont peut utiliser les variables atomiques. Elles sont utiliser lorsqu'on manipule des variables entières. Elles permettent d'effectuer des opérations indivisible sur des variables.
+
+Résumé :
+- Mutex : Quand le contexte permet le "sommeil"
+- Spinlock : Quand le contexte ne permet pas le "sommeil" ou quand le sommeil serait trop couteux (interruptions - sections critiques)
+- Algorithme sans verrouillage : Quand le contexte de permet pas le "sommeil" et que la performance du système est trop impacté par les Spinlocks.
+- Variable atomique : Pour protéger des entiers ou des adresses
+
+Pour en savoir plus sur les mecanismes de verrouillage dans le kernel : https://www.kernel.org/doc/html/latest/kernel-hacking/locking.html
 
 
-Finalement, comme demandé la synchronisation à été basée sur des variables atomiques.
+
+
+
+Comme demandé, la synchronisation à été basée sur des variables atomiques.
 
 Le code est en annexe (Synch_Ex4.c).
 

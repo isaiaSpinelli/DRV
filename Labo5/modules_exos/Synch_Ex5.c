@@ -20,7 +20,7 @@
 #include<asm/atomic.h>
 
 /* Permet de créer un dossier dans le sysfs */
-static struct kobject *kobj_Synch_ex4;
+static struct kobject *kobj_Synch_ex5;
 
 /* Déclare la license du module */
 MODULE_LICENSE("GPL");
@@ -52,6 +52,9 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {	/* Récupération des informations du module préparées dans le fonction probe (request_irq) */
     struct priv *priv = (struct priv *) dev_id;
 	
+	/* Incrémente la variable partagée à chaque fois qu'un bouton est pressé */
+	atomic_inc(&shared_var);
+	
     printk(KERN_NOTICE "Button pushed!\n");
 	/* Incrémentation des leds */
     *(priv->LED_ptr) = *(priv->LED_ptr) + 1;
@@ -64,7 +67,7 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 
 /*
- * Fonction appellée lors de le lecture d'un paramètre dans /sys/kernel/Synch_ex4/
+ * Fonction appellée lors de le lecture d'un paramètre dans /sys/kernel/Synch_ex5/
  */
 static ssize_t shared_var_show(struct kobject *kobj, struct kobj_attribute *attr,
 			char *buf)
@@ -72,7 +75,7 @@ static ssize_t shared_var_show(struct kobject *kobj, struct kobj_attribute *attr
 	return sprintf(buf, "%d\n", atomic_read(&shared_var));
 }
 
-/* Lors d'une addition de shared_var via une ecriture dans /sys/kernel/Synch_ex4/add_qty */
+/* Lors d'une addition de shared_var via une ecriture dans /sys/kernel/Synch_ex5/add_qty */
 static ssize_t add_qty_store(struct kobject *kobj, struct kobj_attribute *attr,
 			 const char *buf, size_t count)
 {
@@ -89,7 +92,7 @@ static ssize_t add_qty_store(struct kobject *kobj, struct kobj_attribute *attr,
 	return count;
 }
 
-/* Lors d'une decrémenter de shared_var via une ecriture dans /sys/kernel/Synch_ex4/decr */
+/* Lors d'une decrémenter de shared_var via une ecriture dans /sys/kernel/Synch_ex5/decr */
 static ssize_t decr_store(struct kobject *kobj, struct kobj_attribute *attr,
 			 const char *buf, size_t count)
 {	/* Decrémente de manière atomique shared_var */
@@ -217,8 +220,8 @@ static int pushbutton_probe(struct platform_device *pdev)
     }
     
     /* Crée une structure kobject dynamiquement et l'enregistre dans sysfs */
-	kobj_Synch_ex4 = kobject_create_and_add("Synch_ex4", kernel_kobj);
-	if (!kobj_Synch_ex4) {
+	kobj_Synch_ex5 = kobject_create_and_add("Synch_ex5", kernel_kobj);
+	if (!kobj_Synch_ex5) {
 		rc = -ENOMEM;
 		printk(KERN_ERR "error kobject_create_and_add (%d)\n", rc);
 		goto kobject_create_fail;
@@ -226,9 +229,9 @@ static int pushbutton_probe(struct platform_device *pdev)
 		
 
 	/* crée le fichier associé avec le kobjet */
-	rc = sysfs_create_group(kobj_Synch_ex4, &attr_group); 
+	rc = sysfs_create_group(kobj_Synch_ex5, &attr_group); 
 	if (rc) {
-		kobject_put(kobj_Synch_ex4);
+		kobject_put(kobj_Synch_ex5);
 	}
 
     printk(KERN_INFO "Interrupt registered!\n");
@@ -259,7 +262,7 @@ static int pushbutton_remove(struct platform_device *pdev)
     printk(KERN_INFO "Removing driver...\n");
     
     /* Retire la structure kobject */
-    kobject_put(kobj_Synch_ex4);
+    kobject_put(kobj_Synch_ex5);
 	
 	/* éteint les leds du module */
     *(priv->LED_ptr) = 0;

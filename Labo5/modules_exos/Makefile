@@ -6,7 +6,7 @@ obj-m := pushbutton_example.o compte_rebours.o kfifo_ex2.o kfifo_ex3.o Synch_Ex4
 PWD := $(shell pwd)
 WARN := -W -Wall -Wstrict-prototypes -Wmissing-prototypes
 
-all: pushbutton_example compte_rebours kfifo_ex2
+all: pushbutton_example compte_rebours kfifo_ex2 kfifo_ex3 Synch_Ex4 Synch_Ex5
 
 pushbutton_example:
 	@echo "Building with kernel sources in $(KERNELDIR)"
@@ -31,6 +31,6 @@ Synch_Ex4:
 Synch_Ex5:
 	@echo "Building with kernel sources in $(KERNELDIR) for Synch_Ex5"
 	$(MAKE) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -C $(KERNELDIR) M=$(PWD) ${WARN}
-
+	
 clean:
 	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions modules.order Module.symvers
