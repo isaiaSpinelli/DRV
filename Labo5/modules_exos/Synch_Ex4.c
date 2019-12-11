@@ -19,8 +19,6 @@
 /* Pour les opérations atomiques*/
 #include<asm/atomic.h>
 
-/* Permet de créer un dossier dans le sysfs */
-static struct kobject *kobj_Synch_ex4;
 
 /* Déclare la license du module */
 MODULE_LICENSE("GPL");
@@ -44,6 +42,8 @@ struct priv
     struct resource *MEM_info;
     /* Numéro d'interruption du module */
     int IRQ_num;
+    /* Permet de créer un dossier dans le sysfs */
+	struct kobject *kobj_Synch_ex4;
     
 };
 
@@ -217,8 +217,8 @@ static int pushbutton_probe(struct platform_device *pdev)
     }
     
     /* Crée une structure kobject dynamiquement et l'enregistre dans sysfs */
-	kobj_Synch_ex4 = kobject_create_and_add("Synch_ex4", kernel_kobj);
-	if (!kobj_Synch_ex4) {
+	priv->kobj_Synch_ex4 = kobject_create_and_add("Synch_ex4", kernel_kobj);
+	if (!priv->kobj_Synch_ex4) {
 		rc = -ENOMEM;
 		printk(KERN_ERR "error kobject_create_and_add (%d)\n", rc);
 		goto kobject_create_fail;
@@ -226,9 +226,9 @@ static int pushbutton_probe(struct platform_device *pdev)
 		
 
 	/* crée le fichier associé avec le kobjet */
-	rc = sysfs_create_group(kobj_Synch_ex4, &attr_group); 
+	rc = sysfs_create_group(priv->kobj_Synch_ex4, &attr_group); 
 	if (rc) {
-		kobject_put(kobj_Synch_ex4);
+		kobject_put(priv->kobj_Synch_ex4);
 	}
 
     printk(KERN_INFO "Interrupt registered!\n");
@@ -259,7 +259,7 @@ static int pushbutton_remove(struct platform_device *pdev)
     printk(KERN_INFO "Removing driver...\n");
     
     /* Retire la structure kobject */
-    kobject_put(kobj_Synch_ex4);
+    kobject_put(priv->kobj_Synch_ex4);
 	
 	/* éteint les leds du module */
     *(priv->LED_ptr) = 0;

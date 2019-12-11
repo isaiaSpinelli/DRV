@@ -43,13 +43,12 @@ MODULE_DESCRIPTION("Maintien une kfifo avec des nombres premiers");
 #define MINOR_NUM 		0
 #define MY_DEV_COUNT 	1
 
-static struct kobject *kobj_Kfifo_ex3;
 
 /* Delcare la kfifo */
 static DECLARE_KFIFO_PTR(my_kfifo, int);
 /* Init le nombre de nombre premier dans la kfifo*/
 static unsigned int N = 50;
-/* Count le nombre de read */
+/* Count le nombre de read au total */
 static unsigned int countRead = 0;
 
 /* Tableau des 50 premiers nombres premiers */
@@ -69,17 +68,20 @@ struct priv
 {
     /* structure du device */
 	struct cdev my_cdev;
+	/* Permet de créer un dossier dans le sysfs */
+	struct kobject *kobj_Kfifo_ex3;
 
 };
 
 /* Remplie la fifo avec les nombres premiers souhaités */
 void fill_kfifo(unsigned int NB){
 	int i;
+	
 	for (i = NB-1; i >= 0; i--){
 		kfifo_put(&my_kfifo, NOMBRES_PREMIER[i]);
 	}
 }
-
+/* Lors de l'ouverture du fichier */
 static int kfifo_open(struct inode* node, struct file * f)
 {
 	/* Récupération des informations du module (structure privée) */
@@ -89,7 +91,6 @@ static int kfifo_open(struct inode* node, struct file * f)
     f->private_data = priv_s;
     
     return 0;
-	
 }
 
 /* Une lecture permettra de récupérer le nombre premier dans la kfifo*/
@@ -130,7 +131,7 @@ kfifo_read(struct file *filp, char __user *buf,
 	
 	/* Si la kfifo est vide, la remplie*/
 	if (kfifo_is_empty(&my_kfifo)) {
-		fill_kfifo(N);
+		fill_kfifo( N);
 	}
 	
 	// màj de la position
@@ -139,33 +140,12 @@ kfifo_read(struct file *filp, char __user *buf,
     return *ppos;
 }
 
-/*
-static ssize_t
-kfifo_write(struct file *filp, const char __user *buf,
-             size_t count, loff_t *ppos)
-{
-	struct priv *priv_s ;
-
-	priv_s = (struct priv *) filp->private_data;
-	
-	// Test les entrées
-    if (count == 0) {
-        return 0;
-    }
-	
-	
-    return count;
-}
-*/
-
-
 
 const static struct
 file_operations compte_fops = {
     .owner         = THIS_MODULE,
     .read          = kfifo_read,
     .open          = kfifo_open,
-//    .write         = kfifo_write,
 };
 
 /*
@@ -182,13 +162,13 @@ static ssize_t kobject_show(struct kobject *kobj, struct kobj_attribute *attr,
 	else if (strcmp(attr->attr.name, "countRead") == 0)
 		var = countRead; // N - kfifo_len(&my_kfifo) ;
 	else {
-		/* Lis le prochain element de la kfifi sans la supprimer */
+		/* Lis le prochain element de la kfifo sans la supprimer */
 		if ( kfifo_peek(&my_kfifo, &var) == 0 ) {
 			/* Si elle est vide (ne devrait pas arriver) remplie la kfifo*/
 			fill_kfifo(N);
 		}
 	}
-		
+	/* Renvoie la variable souhaitée */
 	return sprintf(buf, "%d\n", var);
 }
 /* Lors d'une modification de N via le /sys */
@@ -209,7 +189,6 @@ static ssize_t N_store(struct kobject *kobj, struct kobj_attribute *attr,
 		kfifo_reset(&my_kfifo);
 		fill_kfifo(N);
 	}
-	
 	
 	if (rc < 0)
 		return rc;
@@ -310,6 +289,7 @@ static int kfifo_probe(struct platform_device *pdev)
 	}
 	printk(KERN_INFO "N = %d\n", N);
     
+    
 
     /* Init la kfifo */
     rc = kfifo_alloc(&my_kfifo, N, GFP_KERNEL);
@@ -323,8 +303,8 @@ static int kfifo_probe(struct platform_device *pdev)
     fill_kfifo(N);
 
 	/* Crée un objet dans /sys/kernel */
-	kobj_Kfifo_ex3 = kobject_create_and_add("Kfifo_ex3", kernel_kobj);
-	if (!kobj_Kfifo_ex3) {
+	priv->kobj_Kfifo_ex3 = kobject_create_and_add("Kfifo_ex3", kernel_kobj);
+	if (!priv->kobj_Kfifo_ex3) {
 		rc = -ENOMEM;
 		printk(KERN_ERR "error kobject_create_and_add (%d)\n", rc);
 		goto kobject_create_fail;
@@ -332,9 +312,9 @@ static int kfifo_probe(struct platform_device *pdev)
 		
 
 	/* crée le fichier associé avec le kobjet */
-	rc = sysfs_create_group(kobj_Kfifo_ex3, &attr_group); 
+	rc = sysfs_create_group(priv->kobj_Kfifo_ex3, &attr_group); 
 	if (rc) {
-		kobject_put(kobj_Kfifo_ex3);
+		kobject_put(priv->kobj_Kfifo_ex3);
 	}
 
 
@@ -366,7 +346,7 @@ static int kfifo_remove(struct platform_device *pdev)
     printk(KERN_INFO "Removing driver...\n");
     
 	/* Retire l'object precedement crée */
-    kobject_put(kobj_Kfifo_ex3);
+    kobject_put(priv->kobj_Kfifo_ex3);
     
     /* retire la kfifo allouée */
     kfifo_free(&my_kfifo);

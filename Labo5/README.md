@@ -125,14 +125,12 @@ Finalement, quand c'est disponible ont peut utiliser les variables atomiques. El
 Résumé :
 - Mutex : Quand le contexte permet le "sommeil"
 - Spinlock : Quand le contexte ne permet pas le "sommeil" ou quand le sommeil serait trop couteux (interruptions - sections critiques)
-- Algorithme sans verrouillage : Quand le contexte de permet pas le "sommeil" et que la performance du système est trop impacté par les Spinlocks.
+- Algorithme sans verrouillage : Quand le contexte ne permet pas le "sommeil" et que la performance du système est trop impacté par les Spinlocks.
 - Variable atomique : Pour protéger des entiers ou des adresses
 
 Pour en savoir plus sur les mecanismes de verrouillage dans le kernel : https://www.kernel.org/doc/html/latest/kernel-hacking/locking.html
 
-
-
-
+Dans le cas de l'exercice 4, nous faisons des accès à la variable entière partagée (shared_var) dans des contextes où le sommeil est permis ( Pas dans une routine de service ni dans une section critique). Dans ce cas, un mutex ferait très bien l'affaire. Étant donné que la ressource a partager est un simple entier, la méthode de varaible atomique convient très bien.
 
 Comme demandé, la synchronisation à été basée sur des variables atomiques.
 
@@ -144,7 +142,8 @@ Le but est de reprendre le module développé dans l’exercice 4 et de modifier
 
 Est-ce que vos alternatives pour la gestion de la concurrence ont changé ? Pourquoi ?
 
+Oui ! Maintenant, nous faisons accès à la ressource dans une routine de service ! Donc, nous ne pouvons pas nous permettre de nous endormir. Il est donc préférable d'utiliser les spinlocks. De plus, ils permettent justement de désactiver les interruptions en même temps à l'aide des fonctions "spin_lock_irqsave" et "spin_unlock_irqrestore".
 
-méthode de synchronisation différente de celle utilisée dans l’exercice 4.
+J'ai donc utiliser les spinlocks comme méthode de synchronisation différente de celle utilisée dans l’exercice 4.
 
-Le code est en annexe (Synch_Ex4.c).
+Le code est en annexe (Synch_Ex5.c).

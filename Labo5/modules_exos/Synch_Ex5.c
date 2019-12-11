@@ -19,10 +19,6 @@
 /* Pour les opérations atomiques*/
 #include<asm/atomic.h>
 
-/* Permet de créer un dossier dans le sysfs */
-static struct kobject *kobj_Synch_ex5;
-/* spinlock permettant de protéger la variable shared_var */
-static spinlock_t lock_shared_var;
 
 /* Déclare la license du module */
 MODULE_LICENSE("GPL");
@@ -33,6 +29,8 @@ MODULE_DESCRIPTION("Exercice 4 de Synchronisation");
 
 /* Variable entière paratgée init à 7 */
 static int shared_var = 7;
+/* spinlock permettant de protéger la variable shared_var */
+static spinlock_t lock_shared_var;
 
 /* Structure permettant de mémoriser les informations importantes du module */
 struct priv
@@ -46,6 +44,8 @@ struct priv
     struct resource *MEM_info;
     /* Numéro d'interruption du module */
     int IRQ_num;
+    /* Permet de créer un dossier dans le sysfs */
+	struct kobject *kobj_Synch_ex5;
     
 };
 
@@ -101,7 +101,7 @@ static ssize_t add_qty_store(struct kobject *kobj, struct kobj_attribute *attr,
 	if (rc < 0)
 		return rc;
 	
-	/* Additionne la variable shared_var avec la valeur écrite*/
+	/* Additionne la variable shared_var avec la valeur écrite dans le fichier */
 	spin_lock_irqsave(&lock_shared_var, flags);
 	shared_var += addVal;
 	spin_unlock_irqrestore(&lock_shared_var, flags);
@@ -242,8 +242,8 @@ static int pushbutton_probe(struct platform_device *pdev)
     }
     
     /* Crée une structure kobject dynamiquement et l'enregistre dans sysfs */
-	kobj_Synch_ex5 = kobject_create_and_add("Synch_ex5", kernel_kobj);
-	if (!kobj_Synch_ex5) {
+	priv->kobj_Synch_ex5 = kobject_create_and_add("Synch_ex5", kernel_kobj);
+	if (!priv->kobj_Synch_ex5) {
 		rc = -ENOMEM;
 		printk(KERN_ERR "error kobject_create_and_add (%d)\n", rc);
 		goto kobject_create_fail;
@@ -251,9 +251,9 @@ static int pushbutton_probe(struct platform_device *pdev)
 		
 
 	/* crée le fichier associé avec le kobjet */
-	rc = sysfs_create_group(kobj_Synch_ex5, &attr_group); 
+	rc = sysfs_create_group(priv->kobj_Synch_ex5, &attr_group); 
 	if (rc) {
-		kobject_put(kobj_Synch_ex5);
+		kobject_put(priv->kobj_Synch_ex5);
 	}
 	
 	
@@ -287,7 +287,7 @@ static int pushbutton_remove(struct platform_device *pdev)
     printk(KERN_INFO "Removing driver...\n");
     
     /* Retire la structure kobject */
-    kobject_put(kobj_Synch_ex5);
+    kobject_put(priv->kobj_Synch_ex5);
 	
 	/* éteint les leds du module */
     *(priv->LED_ptr) = 0;
