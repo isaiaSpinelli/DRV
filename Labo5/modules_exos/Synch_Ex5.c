@@ -80,7 +80,13 @@ static ssize_t shared_var_show(struct kobject *kobj, struct kobj_attribute *attr
 {	
 	unsigned long flags;
 	int rc = -1;
-	/* Permet de lock pour lire la variable partagé*/ // read_lock_irqsave(&xxx_lock, flags);
+	
+	/* Récupération des informations du module (structure privée) */
+    //struct priv *priv_s ;
+    //priv_s = container_of(&kobj, struct priv, kobj_Synch_ex5);
+    
+    
+	/* Permet de lock pour lire la variable partagé*/
 	spin_lock_irqsave(&lock_shared_var, flags);
 	/* Place dans le buf la valeur de shared_var */
 	rc = sprintf(buf, "%d\n", shared_var);
@@ -253,9 +259,10 @@ static int pushbutton_probe(struct platform_device *pdev)
 	/* crée le fichier associé avec le kobjet */
 	rc = sysfs_create_group(priv->kobj_Synch_ex5, &attr_group); 
 	if (rc) {
-		kobject_put(priv->kobj_Synch_ex5);
+		rc = -rc;
+		printk(KERN_ERR "error sysfs_create_group (%d)\n", rc);
+		goto sysfs_create_group_fail;
 	}
-	
 	
 	spin_lock_init(&lock_shared_var);
 
@@ -265,6 +272,8 @@ static int pushbutton_probe(struct platform_device *pdev)
     return 0;
 
 /* Déclaration de labels afin de gérer toutes les erreurs possibles de la fonction probe ci-dessus */
+ sysfs_create_group_fail:
+	kobject_put(priv->kobj_Synch_ex5);
  kobject_create_fail:
  request_irq_fail:
  get_irq_fail:

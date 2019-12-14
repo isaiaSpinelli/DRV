@@ -19,6 +19,18 @@ read Count ??
 
 Ce laboratoire utilise le même environnement que le laboratoire précédent, qui peut donc être réutilisé.
 
+## Test des programmes
+
+Afin de tester tous les exercices qui suivrons, voici une marche à suivre générale:
+1. Compiler le module souhaité avec la commande (Ex : make <Nom_fichier>)
+2. Copier le moduler (.ko) sur la DE1 via /export/drv
+3. Insérer le module depuis le DE1 avec la commande "insmod <Nom_module>"
+4. Une fois terminé, vous pouvez supprimer le module avec la commande "rmmod <Nom_module>"
+
+Remarque :
+Afin de faire passé ma structure privée dans les diverese fonctions "kobject_**show** ou N_**store**" j'ai essayer d'utiliser la super macro "container_of" qui permet de récupérer l'adresse de la structure privée via un pointeur sur un champs de cette structure.
+Malheureusement, avec une structure de type "struct kobject" je n'y suis pas parvenu.
+
 ## KThreads et timers
 
 D’autres fonctionnalités que l’on retrouve également dans l’espace noyau sont les threads et les timers. Il est possible pour un module de démarrer des tâches d’arrière plan, d’effectuer un polling sur un périphérique à intervalle régulière, ou encore de déléguer le traitement d’une interruption à un thread afin de ne pas rester dans une routine d’interruption trop longtemps.
@@ -147,3 +159,7 @@ Oui ! Maintenant, nous faisons accès à la ressource dans une routine de servic
 J'ai donc utiliser les spinlocks comme méthode de synchronisation différente de celle utilisée dans l’exercice 4.
 
 Le code est en annexe (Synch_Ex5.c).
+
+# Conclusion
+
+Je trouve que ce laboratoire a été particulièrement instructif. J'ai l'impression qu'en peu de temps j'ai appris enormement de choses dans tout ce qui concerne les drivers et le codage kernel.
