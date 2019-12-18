@@ -4,9 +4,6 @@ Début : 20.11.19
 
 lien du laboratoire : http://reds-lab.einet.ad.eivd.ch/drv_2019/lab_05/lab_05.html#
 
-gloable ex3 ? (kset ?)
-read Count ??
-
 ## Objectifs
 
 - Savoir gérer threads, timers et interruptions en kernel-space
@@ -32,10 +29,10 @@ Pour les exercices, les attributs dans le sysfs est dans : /sys/kernel/<Nom_Ex>/
 Pour le dernier exercice refait (Synch_Ex5_clean.c) les attributs sont dans : /sys/devices/platform/ff200000.drv/mydrv/<attribut>
 
 Remarque :
-Afin de faire passé ma structure privée dans les diverese fonctions "kobject_**show** ou N_**store**" j'ai essayer d'utiliser la super macro "container_of" qui permet de récupérer l'adresse de la structure privée via un pointeur sur un champs de cette structure.
-Malheureusement, avec une structure de type "struct kobject" je n'y suis pas parvenu.
+Afin de faire passer ma structure privée dans les diverses fonctions "kobject _**show** ou N _**store**" j'ai essayé d'utiliser la super macro "container_of" qui permet de récupérer l'adresse de la structure privée via un pointeur sur un champs de cette structure.
+Malheureusement, avec une structure de type "struct kobject" je n'y suis pas parvenu car c'est vite complexe avec le ktype.
 
-Après avoir terminé tous les exercies, Roberto Rigamonti m'a aidé pour me montrer une méthode qui permet de passer une structure privée dans les fonctions SHOW et STORE dans le sysfs. Afin de maitriser cette méthode sans devoir tout refaire, j'ai refait seulement le dernier exercice avec la bonne méthode (**Synch_Ex5_clean.c**)
+Après avoir terminé tous les exercices, Roberto Rigamonti m'a aidé pour me montrer une méthode qui permet de passer une structure privée dans les fonctions SHOW et STORE dans le sysfs. Afin de maitriser cette méthode sans devoir tout refaire, j'ai refait seulement le dernier exercice avec la bonne méthode (**Synch_Ex5_clean.c**)
 
 ## KThreads et timers
 
@@ -78,7 +75,7 @@ Ensuite, à chaque lecture du device node correspondant au module, le driver doi
 
 Le code est en annexe (kfifo_ex2.c).
 
-Remarque: Pour cette excercie, je n'avais pas bien lu la consigne. De ce fait, la kfifo se vide du plus petit au plus grand. La correction à cet exercice est faite dans le prochain exercice (Exercice 3)
+Remarque: Pour cette exercice, je n'avais pas bien lu la consigne. De ce fait, la kfifo se vide du plus petit au plus grand. La correction à cet exercice est faite dans le prochain exercice (Exercice 3)
 
 ## Symboles exportés
 
@@ -90,7 +87,7 @@ Vous pouvez avoir davantage d’informations concernant les symboles ici : https
 
 ## Sysfs
 
-Au paravant, une interface permettait aux utilisateurs d’interagir avec le noyau Linux. Le nom de cette interface était procfs, et consistait en un filesystem virtuel avec lequel le noyau pouvait montrer au user-space des informations sur son fonctionnement et il pouvait récupérer des paramètres de configuration. Malheureusement, avec le temps ce filesystem est devenu de plus en plus encombré par des informations non pertinentes, mais la « peur de casser quelque chose » empêchait de faire le ménage. Ainsi, il a été décidé de répartir de zéro, mais d’une façon plus structurée, avec sysfs, tout en gardant procfs.
+Au paravent, une interface permettait aux utilisateurs d’interagir avec le noyau Linux. Le nom de cette interface était procfs, et consistait en un filesystem virtuel avec lequel le noyau pouvait montrer au user-space des informations sur son fonctionnement et il pouvait récupérer des paramètres de configuration. Malheureusement, avec le temps ce filesystem est devenu de plus en plus encombré par des informations non pertinentes, mais la « peur de casser quelque chose » empêchait de faire le ménage. Ainsi, il a été décidé de répartir de zéro, mais d’une façon plus structurée, avec sysfs, tout en gardant procfs.
 
 Les détails de sysfs sont donnés dans la documentation du noyau (fichier Documentation/filesystems/sysfs.txt), et des exemples d’utilisation sont disponibles dans samples/kobject. Une explication très détaillée est donnée dans le chapitre 14 de Linux Device Drivers, 3rd edition. (https://lwn.net/Kernel/LDD3/)
 
@@ -105,9 +102,11 @@ Le but est de modifier le code de l’exercice précédent pour que le module so
 
 Le code est en annexe (kfifo_ex3.c).
 
+Remarque: Pour cette exercice, j'ai pu corriger l'exercice précèdent en vidant la kfifo du plus grand au plus petit.
+
 ## Synchronisation
 
-Le noyau Linux est un logiciel multithreadé et multiprocesseur qui est particulièrement sensible aux problèmes de concurrence car il doit, par sa nature, s’adapter aux événements générés par le hardware sous-jacente. Pour cette raison il dispose d’un riche ensemble de primitives de synchronisation, qu’on peut voir dans le chapitre 5 de Linux Device Drivers, 3rd edition. (https://lwn.net/Kernel/LDD3/)
+Le noyau Linux est un logiciel multithreadé et multiprocesseur qui est particulièrement sensible aux problèmes de concurrence car il doit, par sa nature, s’adapter aux événements générés par le hardware sous-jacente. Pour cette raison il dispose d’un riche ensemble de primitives de synchronisation, qu’on peut voir dans le chapitre 5 de Linux Device Drivers, 3rd Edition. (https://lwn.net/Kernel/LDD3/)
 
 ### Exercice 4 synchronisation (I)
 
@@ -116,7 +115,7 @@ Le but est de reprendre l’exemple pushbutton_example du laboratoire 4 et d'y a
 - Une variable entière shared_var initialisée à 7.
 - Un fichier sysfs qui permet de voir la valeur de shared_var.
 - Un fichier sysfs add_qty pour incrémenter la valeur de shared_var d’une quantité spécifiée lors de l’écriture dans le fichier.
-- Un fichier sysfs decr pour decrémenter la valeur de shared_var de 1.
+- Un fichier sysfs decr pour décrémenter la valeur de shared_var de 1.
 
 Qu’est-ce que pourriez-vous utiliser pour gérer les problèmes de concurrence ?
 
@@ -127,7 +126,7 @@ Comme vu en cours, il y a essentiellement 3 méthodes pour gérer les problèmes
 - Algorithmes sans verrouillage (Ex : RCU)
 - les variables atomiques
 
-Le mutex est la principal métode de verrouillage. Ils permettent de faire une demande pour avoir un accès unique sur la ressource. Si la ressource est déjà utilisée, le processus est bloqué. Il faut donc être dans un contexte où le "sommeil" est autorisé.
+Le mutex est la principal méthode de verrouillage. Ils permettent de faire une demande pour avoir un accès unique sur la ressource. Si la ressource est déjà utilisée, le processus est bloqué. Il faut donc être dans un contexte où le "sommeil" est autorisé.
 
 Le Spinlock est principalement utilisé lors de contexte où le "sommeil" :
 - n'est pas autorisé (Ex: gestionnaires d'interruption)
@@ -146,9 +145,9 @@ Résumé :
 - Algorithme sans verrouillage : Quand le contexte ne permet pas le "sommeil" et que la performance du système est trop impacté par les Spinlocks.
 - Variable atomique : Pour protéger des entiers ou des adresses
 
-Pour en savoir plus sur les mecanismes de verrouillage dans le kernel : https://www.kernel.org/doc/html/latest/kernel-hacking/locking.html
+Pour en savoir plus sur les mécanismes de verrouillage dans le kernel : https://www.kernel.org/doc/html/latest/kernel-hacking/locking.html
 
-Dans le cas de l'exercice 4, nous faisons des accès à la variable entière partagée (shared_var) dans des contextes où le sommeil est permis ( Pas dans une routine de service ni dans une section critique). Dans ce cas, un mutex ferait très bien l'affaire. Étant donné que la ressource a partager est un simple entier, la méthode de varaible atomique convient très bien.
+Dans le cas de l'exercice 4, nous faisons des accès à la variable entière partagée (shared_var) dans des contextes où le sommeil est permis ( Pas dans une routine de service ni dans une section critique). Dans ce cas, un mutex ferait très bien l'affaire. Étant donné que la ressource a partager est un simple entier, la méthode de variable atomique convient très bien.
 
 Comme demandé, la synchronisation à été basée sur des variables atomiques.
 
@@ -166,8 +165,8 @@ J'ai donc utiliser les spinlocks comme méthode de synchronisation différente d
 
 Le code est en annexe (Synch_Ex5.c).
 
-Remarque: Comme dis precedemment, cet exercice à été refait avec une méthode plus correcte afin de ne pas avoir de variables globales. Vous pouvez l'observer dans le fichier "Synch_Ex5_clean.c".
+Remarque: Comme dis précédemment, cet exercice à été refait avec une méthode plus correcte afin de ne pas avoir de variables globales. Vous pouvez l'observer dans le fichier "Synch_Ex5_clean.c".
 
 # Conclusion
 
-Je trouve que ce laboratoire a été particulièrement instructif. J'ai l'impression qu'en peu de temps j'ai appris enormement de choses dans tout ce qui concerne les drivers et le codage kernel.
+Je trouve que ce laboratoire a été particulièrement instructif. J'ai l'impression qu'en peu de temps j'ai appris énormément de choses dans tout ce qui concerne les drivers et le codage kernel.
