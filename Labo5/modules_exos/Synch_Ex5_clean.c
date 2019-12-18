@@ -1,6 +1,6 @@
 /*
  * Auteurs : Spinelli Isaia
- * Date : 11.12.19
+ * Date : 18.12.19
  * 
  */
 #include <linux/kernel.h>
@@ -16,9 +16,6 @@
 #include <linux/slab.h>
 #include "address_map_arm.h"
 #include "interrupt_ID.h"
-/* Pour les opérations atomiques*/
-#include<asm/atomic.h>
-
 
 /* Déclare la license du module */
 MODULE_LICENSE("GPL");
@@ -27,10 +24,7 @@ MODULE_AUTHOR("REDS_Spinelli");
 /* Indique une description du module*/
 MODULE_DESCRIPTION("Exercice 4 de Synchronisation");
 
-/* Variable entière paratgée init à 7 */
-static int shared_var = 7;
-/* spinlock permettant de protéger la variable shared_var */
-static spinlock_t lock_shared_var;
+
 
 /* Structure permettant de mémoriser les informations importantes du module */
 struct priv
@@ -44,8 +38,12 @@ struct priv
     struct resource *MEM_info;
     /* Numéro d'interruption du module */
     int IRQ_num;
-    /* Permet de créer un dossier dans le sysfs */
-	struct kobject kobj_Synch_ex5;
+    /* ptr sur le device */
+    struct device *dev;
+    /* Variable entière paratgée init à 7 */
+	int shared_var;
+	/* spinlock permettant de protéger la variable shared_var */
+	spinlock_t lock_shared_var;
     
 };
 
@@ -57,9 +55,9 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
     struct priv *priv = (struct priv *) dev_id;
 	
 	/* Incrémente la variable partagée à chaque fois qu'un bouton est pressé */
-	spin_lock_irqsave(&lock_shared_var, flags);
-	shared_var++;
-	spin_unlock_irqrestore(&lock_shared_var, flags);
+	spin_lock_irqsave(&priv->lock_shared_var, flags);
+	priv->shared_var++;
+	spin_unlock_irqrestore(&priv->lock_shared_var, flags);
 	
     printk(KERN_NOTICE "Button pushed!\n");
 	/* Incrémentation des leds */
@@ -71,98 +69,94 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
     return (irq_handler_t) IRQ_HANDLED;
 }
 
-
-/*
- * Fonction appellée lors de le lecture d'un paramètre dans /sys/kernel/Synch_ex5/
- */
-static ssize_t shared_var_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
-{	
-	unsigned long flags;
-	int rc = -1;
-	
-	/* Récupération des informations du module (structure privée) */
-    struct priv *priv_s ;
-    priv_s = container_of(kobj, struct priv, kobj_Synch_ex5);
-    printk(KERN_ERR "priv = %p\n", priv_s);
-    printk(KERN_ERR "IRQ = %d\n", priv_s->IRQ_num );
-    
-    
-	/* Permet de lock pour lire la variable partagé*/
-	spin_lock_irqsave(&lock_shared_var, flags);
-	/* Place dans le buf la valeur de shared_var */
-	rc = sprintf(buf, "%d\n", shared_var);
-	spin_unlock_irqrestore(&lock_shared_var, flags);
-	
-	return rc; 
-}
-
-/* Lors d'une addition de shared_var via une ecriture dans /sys/kernel/Synch_ex5/add_qty */
-static ssize_t add_qty_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
-{	
+/* Lors d'une addition de shared_var via une ecriture dans /sys/devices/platform/ff200000.drv/mydrv/add_qty */
+static ssize_t add_qty_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t count)
+{
 	unsigned long flags;
 	int rc;
 	int addVal ;
+	/* Récupération des informations du module (structure privée) */
+    struct priv *mypriv = dev_get_drvdata(dev);
+    
 	/* Récupére la valeur à ajouter*/
 	rc = kstrtoint(buf, 10, &addVal);
 	if (rc < 0)
 		return rc;
 	
 	/* Additionne la variable shared_var avec la valeur écrite dans le fichier */
-	spin_lock_irqsave(&lock_shared_var, flags);
-	shared_var += addVal;
-	spin_unlock_irqrestore(&lock_shared_var, flags);
+	spin_lock_irqsave(&mypriv->lock_shared_var, flags);
+	mypriv->shared_var += addVal;
+	spin_unlock_irqrestore(&mypriv->lock_shared_var, flags);
 
 	return count;
 }
 
-/* Lors d'une decrémenter de shared_var via une ecriture dans /sys/kernel/Synch_ex5/decr */
-static ssize_t decr_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
-{	
+/* Lors d'une decrémenter de shared_var via une ecriture dans /sys/devices/platform/ff200000.drv/mydrv/decr */
+static ssize_t decr_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t count)
+{
 	unsigned long flags;
+
+	/* Récupération des informations du module (structure privée) */
+    struct priv *mypriv = dev_get_drvdata(dev);
+    
 	/* Decrémente la variable shared_var */
-	spin_lock_irqsave(&lock_shared_var, flags);
-	shared_var--;
-	spin_unlock_irqrestore(&lock_shared_var, flags);
+	spin_lock_irqsave(&mypriv->lock_shared_var, flags);
+	mypriv->shared_var--;
+	spin_unlock_irqrestore(&mypriv->lock_shared_var, flags);
 	
 	return count;
 }
+
+/* lecture dans de la varaible paratgée dans : /sys/devices/platform/ff200000.drv/mydrv/shared_var    */
+static ssize_t mydrv_shared_var_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+	unsigned long flags;
+	int rc = -1;
+	/* Récupération des informations du module (structure privée) */
+    struct priv *mypriv = dev_get_drvdata(dev);
+
+    /* Permet de lock pour lire la variable partagé*/
+	spin_lock_irqsave(&mypriv->lock_shared_var, flags);
+	/* Place dans le buf la valeur de shared_var */
+	rc = sprintf(buf, "%d\n", mypriv->shared_var);
+	spin_unlock_irqrestore(&mypriv->lock_shared_var, flags);
+
+    return rc;
+}
+
+
 
 /* attribut pour lire shared_var */
-static struct kobj_attribute shared_var_attribute =
-	__ATTR(shared_var, 0444, shared_var_show, NULL);
-	
-/* attribut pour additionner shared_var d'une valeur écrite */
-static struct kobj_attribute add_qty_attribute =
-	__ATTR(add_qty, 0664, shared_var_show, add_qty_store);
-	
-/* attribut pour decrémenter shared_var */
-static struct kobj_attribute decr_attribute =
-	__ATTR(decr, 0664, shared_var_show, decr_store);
-	
-	
+static DEVICE_ATTR(shared_var, 0444, mydrv_shared_var_show,
+                   NULL);     
+/* attribut pour additionner shared_var d'une valeur écrite */               
+static DEVICE_ATTR(add_qty, 0664, mydrv_shared_var_show,
+                   add_qty_store);     
+/* attribut pour decrémenter shared_var */                
+static DEVICE_ATTR(decr, 0664, mydrv_shared_var_show,
+                   decr_store);             
+       
 /*
  * Créez un groupe d'attributs afin que nous puissions les créer et 
  * les détruire tous en même temps.
- */
-static struct attribute *attrs[] = {
-	&shared_var_attribute.attr,
-	&add_qty_attribute.attr,
-	&decr_attribute.attr,
-	NULL,	/* need to NULL terminate the list of attributes */
+ */            
+static struct attribute *mydrv_attrs[] = {
+    &dev_attr_shared_var.attr,
+    &dev_attr_add_qty.attr,
+    &dev_attr_decr.attr,
+    NULL
 };
 
-/*
- * An unnamed attribute group will put all of the attributes directly in
- * the kobject directory.  If we specify a name, a subdirectory will be
- * created for the attributes with the directory being the name of the
- * attribute group.
- */
-static struct attribute_group attr_group = {
-	.attrs = attrs,
+/* Permet d'avoir un nom de repertoire pour nos attributs */
+static struct attribute_group mydrv_group = {
+    .name = "mydrv",
+    .attrs = mydrv_attrs,
 };
+
+                  
 
 /* Fonction probe appelée lors du branchement du périphérique (pdev est un poiteur sur une structure contenant toutes les informations du device détécté) */
 static int pushbutton_probe(struct platform_device *pdev)
@@ -180,7 +174,9 @@ static int pushbutton_probe(struct platform_device *pdev)
 		/* Fin de la fonction et retourne rc */
         goto kmalloc_fail;
     }
-    printk(KERN_ERR "priv = %p\n", priv);
+    
+    priv->dev = &pdev->dev;
+    
 	/* Lis le pointeur de la structure contenant les informations du module au platform_device coresspondant (permet de le get dans la fonction remove)*/
     platform_set_drvdata(pdev, priv);
 	/* Récupère l'adresse de base de la mémoire du module depuis la dtb*/
@@ -250,24 +246,19 @@ static int pushbutton_probe(struct platform_device *pdev)
         goto request_irq_fail;
     }
     
-    /* Crée une structure kobject dynamiquement et l'enregistre dans sysfs */
-	rc = kobject_init_and_add(&priv->kobj_Synch_ex5, NULL, kernel_kobj, "Synch_ex5");   // kobject_create_and_add("Synch_ex5", kernel_kobj);
-	if (rc != 0) {
-		rc = -ENOMEM;
-		printk(KERN_ERR "error kobject_create_and_add (%d)\n", rc);
-		goto kobject_create_fail;
-	}
-		
+	/* Ajoute tous les attributs dans le sysfs */
+	rc = sysfs_create_group(&pdev->dev.kobj, &mydrv_group);
+    if (rc) {
+        dev_err(&pdev->dev, "sysfs creation failed\n");
+        rc = -rc;
+        goto sysfs_create_group;
+    }
 
-	/* crée le fichier associé avec le kobjet */
-	rc = sysfs_create_group(&priv->kobj_Synch_ex5, &attr_group); 
-	if (rc) {
-		rc = -rc;
-		printk(KERN_ERR "error sysfs_create_group (%d)\n", rc);
-		goto sysfs_create_group_fail;
-	}
-	
-	spin_lock_init(&lock_shared_var);
+	/* Init la variable paratgée */
+	priv->shared_var = 7;
+
+	/* Init le spin lock */
+	spin_lock_init(&priv->lock_shared_var);
 
     printk(KERN_INFO "Interrupt registered!\n");
     printk(KERN_INFO "Driver ready!\n");
@@ -275,9 +266,7 @@ static int pushbutton_probe(struct platform_device *pdev)
     return 0;
 
 /* Déclaration de labels afin de gérer toutes les erreurs possibles de la fonction probe ci-dessus */
- sysfs_create_group_fail:
-	kobject_put(&priv->kobj_Synch_ex5);
- kobject_create_fail:
+ sysfs_create_group
  request_irq_fail:
  get_irq_fail:
 	/* Démappage de l'adresse virtuelle */
@@ -298,9 +287,9 @@ static int pushbutton_remove(struct platform_device *pdev)
 
     printk(KERN_INFO "Removing driver...\n");
     
-    /* Retire la structure kobject */
-    kobject_put(&priv->kobj_Synch_ex5);
-	
+	 /* Retire tous les attributs du sysfs */
+     sysfs_remove_group(&pdev->dev.kobj, &mydrv_group);
+    
 	/* éteint les leds du module */
     *(priv->LED_ptr) = 0;
 	/* Démappage de l'adresse virtuelle */

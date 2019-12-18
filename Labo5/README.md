@@ -27,9 +27,15 @@ Afin de tester tous les exercices qui suivrons, voici une marche à suivre gén�
 3. Insérer le module depuis le DE1 avec la commande "insmod <Nom_module>"
 4. Une fois terminé, vous pouvez supprimer le module avec la commande "rmmod <Nom_module>"
 
+Pour les exercices, les attributs dans le sysfs est dans : /sys/kernel/<Nom_Ex>/ (Ex : /sys/kernel/Synch_ex5/).
+
+Pour le dernier exercice refait (Synch_Ex5_clean.c) les attributs sont dans : /sys/devices/platform/ff200000.drv/mydrv/<attribut>
+
 Remarque :
 Afin de faire passé ma structure privée dans les diverese fonctions "kobject_**show** ou N_**store**" j'ai essayer d'utiliser la super macro "container_of" qui permet de récupérer l'adresse de la structure privée via un pointeur sur un champs de cette structure.
 Malheureusement, avec une structure de type "struct kobject" je n'y suis pas parvenu.
+
+Après avoir terminé tous les exercies, Roberto Rigamonti m'a aidé pour me montrer une méthode qui permet de passer une structure privée dans les fonctions SHOW et STORE dans le sysfs. Afin de maitriser cette méthode sans devoir tout refaire, j'ai refait seulement le dernier exercice avec la bonne méthode (**Synch_Ex5_clean.c**)
 
 ## KThreads et timers
 
@@ -159,6 +165,8 @@ Oui ! Maintenant, nous faisons accès à la ressource dans une routine de servic
 J'ai donc utiliser les spinlocks comme méthode de synchronisation différente de celle utilisée dans l’exercice 4.
 
 Le code est en annexe (Synch_Ex5.c).
+
+Remarque: Comme dis precedemment, cet exercice à été refait avec une méthode plus correcte afin de ne pas avoir de variables globales. Vous pouvez l'observer dans le fichier "Synch_Ex5_clean.c".
 
 # Conclusion
 

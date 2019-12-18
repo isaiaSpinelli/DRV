@@ -1,12 +1,12 @@
 ### Put here the path to kernel sources! ###
 KERNELDIR := ../../Labo2/linux-socfpga/
 
-obj-m := pushbutton_example.o compte_rebours.o kfifo_ex2.o kfifo_ex3.o Synch_Ex4.o Synch_Ex5.o
+obj-m := pushbutton_example.o compte_rebours.o kfifo_ex2.o kfifo_ex3.o Synch_Ex4.o Synch_Ex5.o Synch_Ex5_clean.o
 
 PWD := $(shell pwd)
 WARN := -W -Wall -Wstrict-prototypes -Wmissing-prototypes
 
-all: pushbutton_example compte_rebours kfifo_ex2 kfifo_ex3 Synch_Ex4 Synch_Ex5
+all: pushbutton_example compte_rebours kfifo_ex2 kfifo_ex3 Synch_Ex4 Synch_Ex5 Synch_Ex5_clean
 
 pushbutton_example:
 	@echo "Building with kernel sources in $(KERNELDIR)"
@@ -30,6 +30,10 @@ Synch_Ex4:
 	
 Synch_Ex5:
 	@echo "Building with kernel sources in $(KERNELDIR) for Synch_Ex5"
+	$(MAKE) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -C $(KERNELDIR) M=$(PWD) ${WARN}
+	
+Synch_Ex5_clean:
+	@echo "Building with kernel sources in $(KERNELDIR) for Synch_Ex5_clean"
 	$(MAKE) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -C $(KERNELDIR) M=$(PWD) ${WARN}
 	
 clean:
