@@ -24,7 +24,7 @@ source 0xf000
 arm-linux-gnueabihf-gcc Ex3.c -o Ex3
 
 
-sudo cp Ex3 /export/drv/
+sudo cp Aff_num.ko /export/drv/Labo6/
 
 (DE1) ./Ex3
 (DE1) sudo insmod /rmmod / dmesg / 
