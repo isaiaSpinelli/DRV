@@ -24,6 +24,9 @@
 #include <linux/miscdevice.h>
 #include <linux/hrtimer.h>
 #include <linux/ktime.h>
+#include <linux/kfifo.h>
+#include <linux/list.h>
+#include <linux/delay.h>
 
 #include "address_map_arm.h"
 #include "interrupt_ID.h"
@@ -33,16 +36,14 @@
 
 
 /* Constantes pour les devices char */
-#define DEVICE_NAME		"AffNum"
-#define MAJOR_NUM		101
-#define MINOR_NUM_0 	0
-#define MINOR_NUM_1 	1
-#define MY_DEV_COUNT 	2
+#define DEVICE_NAME				"AffNum"
+#define MAJOR_NUM				100
+#define MINOR_NUM_0 			0
+#define MINOR_NUM_1 			1
+#define MY_DEV_COUNT 			2
 #define NODE_FIFO_NAME			"fifo"
 #define NODE_READ_SIZE_NAME		"readSize"
-
-/* Tempes initial en seconde du chrono (1h et 15 sec)*/
-#define TEMPS_INIT_SEC 	3615
+#define NAME_WORK_QUEUE			"workqueue"
 
 /* Secondes + nanosecondes pour la période du timer */
 #define PERIODE_TIMER_SEC 0
@@ -60,27 +61,35 @@
 /* Offset du registre pour masquer/demasquer les interruptions */
 #define DMASQ_INT 	2	
 
-/* Nombre de clignotement des leds lors de la fin du chrono */
-#define LEDS_NB_CLIGN 	3
-/* Mask des leds toutes allumées */
-#define LEDS_ON		 	0x3FF	
+/* Base de l'hexadécimal */
+#define HEXA_BASE 		16
 
+/* Valeur par défaut à afficher sur les 7 seg si la kfifo est vide */
+#define VALUE_DEFAULT 					0XF00D
+/* Nombre de fois à afficher la valeur par défaut */
+#define COUNT_DISPLAY_VALUE_DEFAULT 	3
+/* Valeur max de la kfifo */
+#define VALUE_MAX 		0xFFFFFF
 
-/* Structure permettant de mémoriser les informations importantes pour la gestion du chronomètre */
-struct chrono
-{	
-	/* Temps initial du chrono en seconde */
-	unsigned long temps_init;
-	/* Valeur du chronomètre */
-	unsigned long compteur_chrono ;
-	/* Mode du chrono (idle or active) */
-	unsigned char active ;
+/* Nombre maximum de taille différente de la kfifo */
+#define MAX_VALUE_SIZE_DIFF   	128
+/* Taille max avec 5 Switches = 63 + 1 = 64*/
+#define SIZE_INT_MAX_KFIFO   	64
+/* Nombe de byte dans un int */
+#define SIZE_INT_IN_BYTE	sizeof(int)
 
-};
+struct size_list {
+    int size;
+    struct list_head full_list;
+} ;
+
 
 /* Structure permettant de mémoriser les informations importantes du module */
 struct priv
-{	/* Pointeur sur les leds */
+{	
+	/*----------RESSOURCES----------*/
+	
+	/* Pointeur sur les leds */
     volatile int *LED_ptr;
     /* Pointeur sur les 7 seg 0-3 */
     volatile int *SEG0_3_ptr;
@@ -94,15 +103,28 @@ struct priv
     void *MEM_ptr;
     /* Pointeur de structure sur des informations du devices tree */
     struct resource *MEM_info;
+    
+    /*----------INFORAMTIONS----------*/
+    
     /* Numéro d'interruption du module */
     int IRQ_num;
-    /* Structure du timer */
+    /* Indique si un reset est en cours */
+    int inReset;
+    /* Indique le nombre de foi que Key3 a été pressé */
+    int nbKey3Pressed;
+   
+	
+	
+    /*----------TIMER----------*/
+    
     struct hrtimer hr_timer;
+    ktime_t interval;
+     /* Mode du chrono (idle or active) */
+	unsigned char active ;
     
     
-    /* DEVICE / NODE */
+    /*----------DEVICE / NODE----------*/
     
-    /* structure du device */
 	struct cdev my_cdev;
 	struct cdev my_cdev_read;
 	
@@ -111,12 +133,22 @@ struct priv
 	
 	struct class *my_cdev_class;
 	
+
+	/*----------KFIFO----------*/
+	struct kfifo Kfifo;
+	unsigned int size_kfifo;
+
+	struct kfifo Kfifo_wait;
 	
 	
 	
+	/*----------LISTE----------*/
+	struct list_head size_list1;
 	
-	/* structure pour la gestion du chrono */
-	struct chrono my_chrono;
+	/*----------WORK-QUEUES----------*/
+	struct workqueue_struct *work_queue;
+	struct work_struct modifie_kfifo;
+	struct work_struct reset;
 
 };
 
@@ -161,8 +193,8 @@ static int Aff_FIFO_probe(struct platform_device *pdev);
 /* Fonction remove appelée lors du débranchement du périphérique (pdev est un poiteur sur une structure contenant toutes les informations du device retiré) */
 static int Aff_FIFO_remove(struct platform_device *pdev);
 
-
-/* Driver operations */
+/* Clean la list */
+void Cleaning_list(struct priv* priv);
 
 
 
@@ -179,6 +211,9 @@ static ssize_t FIFO_write(struct file *filp, const char __user *buf, size_t coun
 
 
 /* Fonctions utiles */
+static void wq_fn_modif_kfifo(struct work_struct *work);
+static void wq_fn_reset(struct work_struct *work);
+
 
 /* Permet d'afficher 4 chiffres sur les 4 premiers 7 seg */
 void display_Seg0_3(volatile int * ioctrl, char num4, char num3, char num2, char num1);
@@ -186,9 +221,8 @@ void display_Seg0_3(volatile int * ioctrl, char num4, char num3, char num2, char
 void display_Seg4_5(volatile int * ioctrl, char num6, char num5);
                    
 
-
-
-
+/* Convertie un char entre 1-9 ou a-f en valeur décimal */
+#define char_to_int(c) (((c) <= '9') ? (c-48) : ((c)-(87)))
 
 
 #endif /* AFF_NUM_H_ */

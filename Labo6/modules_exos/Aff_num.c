@@ -2,6 +2,7 @@
  * Auteurs : Spinelli Isaia
  * Date : 24.12.19
  * 
+ * Amélioration : Ajouter des protections de concurrences (exemple : des spin_lock pour les kfifo (kfifo_in_spinlocked))
  */
  
 #include "Aff_num.h"
@@ -57,46 +58,151 @@ file_operations SIZE_fops = {
 /* Enregistre le driver via la structure ci-dessus */
 module_platform_driver(pushbutton_driver);
 
-
-
-/* Permet d'afficher 4 chiffres sur les 4 premiers 7 seg */
-void display_Seg0_3(volatile int * ioctrl,
-                  char num4, char num3, char num2, char num1)
+/* Fonction de work queue pour la modification de la kfifo */
+static void wq_fn_modif_kfifo(struct work_struct *work)
 {
-	*ioctrl = 0x0 | hex_digits[num4 - '0'] << 24 | 
-					hex_digits[num3 - '0'] << 16 | 
-					hex_digits[num2 - '0'] << 8 | 
-					hex_digits[num1 - '0'];
-}
-/* Permet d'afficher 2 chiffre sur les 2 derniers 7 seg */
-void display_Seg4_5(volatile int * ioctrl,
-                   char num6, char num5)
+	int size_free,rc,val;
+	int val_read[SIZE_INT_MAX_KFIFO];
+    struct priv *priv = container_of(work, struct priv, modifie_kfifo);
+
+	/* Si des valeurs sont en attentes, remplis la kfifo principale  */
+	/* Calcul le nombre de place maintenant libre */
+	size_free = priv->size_kfifo - (kfifo_len(&priv->Kfifo)/SIZE_INT_IN_BYTE) ;
+	if ( size_free <= 0) {
+		if ( (rc = kfifo_out(&priv->Kfifo, val_read, (-size_free)*SIZE_INT_IN_BYTE)) < 0) {
+			pr_err("Error kfifo_out (err=%d)\n",rc);
+		}	
+	/* Si des valeurs peuvent être ajouté à la kfifo */
+	} else {
+	
+		/* Améliroation possible avec MIN(size_free, kfifo_len)
+		 * et kfifo_out - kfifo_in la valeur min  */
+		
+		printk(KERN_DEBUG "refill kfifo\n");
+		
+		/* Tant qu'il y a de la place et que des valeurs sont en attente*/
+		while ( size_free-- != 0 && kfifo_len(&priv->Kfifo_wait) ) {
+		
+			/* Remplie la kfifo avec les valeurs en attentes */
+			if ( (rc = kfifo_out(&priv->Kfifo_wait, &val, 4)) < 0) {
+				pr_err("Error kfifo_out (err=%d)\n",rc);
+			}
+			
+			/* La place dans la kfifo */
+			if ( (rc = kfifo_in(&priv->Kfifo, &val, 4)) <= 0 ) {
+				pr_err("Error kfifo_in (err=%d)\n",rc);
+			}
+		}
+	}
+} 
+
+/* Fonction de work queue pour le reset 
+ * Amélioration : remplacer la fonction msleep avec un timer et une wait_queue_head_t*/
+static void wq_fn_reset(struct work_struct *work)
 {
-    *ioctrl = 0x0 | hex_digits[num6 - '0'] << 8 | hex_digits[num5 - '0'];
+	struct list_head *pos, *q;
+    struct priv *priv = container_of(work, struct priv, reset);
+    struct size_list *size;
+    
+    printk(KERN_DEBUG "reset...\n");
+    /* Indique que nous faisons un reset */
+    priv->inReset=1;
+		
+	/* reset les kfifo */
+	kfifo_reset(&priv->Kfifo);
+	kfifo_reset(&priv->Kfifo_wait);
+	
+	/* reset la liste */
+	list_for_each_safe( pos, q, &priv->size_list1) {
+		struct size_list *tmp;
+		tmp = list_entry( pos, struct size_list, full_list);
+		list_del( pos );
+		kfree( tmp );
+	}
+	
+	/* Eteint les 7 seg */
+	*priv->SEG0_3_ptr = 0;
+	*priv->SEG4_5_ptr = 0;
+	/* Attend 5 secondes */
+	msleep(5000);
+	/* Indique la fin du reset */
+	priv->inReset=0;
+	
+	/* Ajoute le noeud de la taille actuelle */
+	size = (struct size_list *) kmalloc( sizeof(struct size_list), GFP_KERNEL );
+	size->size = priv->size_kfifo;
+	list_add(&size->full_list, &priv->size_list1);
+	printk(KERN_DEBUG "reset ok\n");
+
 }
 
+
+/* Callback du timer (période = 1/2 secondes )*/
 enum hrtimer_restart my_hrtimer_callback (struct hrtimer * timer)
 {
-	ktime_t interval;
+	int val = VALUE_DEFAULT;
+	int i, rc;
+	char val_str[7];
 	/* Récupère la structure privé */
-	struct priv *priv_s = from_timer(priv_s, timer, hr_timer);
+	struct priv *priv = from_timer(priv, timer, hr_timer);
+
+	/* Si on veut afficher la kfifo vide */
+	if (priv->active==1 && kfifo_is_empty(&priv->Kfifo)){
+		/* Insére (3x) la valeur par défaut (FOOD) dans la kfifo*/
+		for (i=0; i < COUNT_DISPLAY_VALUE_DEFAULT; ++i) {
+			if ( (rc = kfifo_in(&priv->Kfifo, &val, SIZE_INT_IN_BYTE)) <= 0 ) {
+				rc = -rc;
+				pr_err("Error kfifo_in (err=%d)\n",rc);
+				return rc;
+			}
+		}
+	}
 	
-	
-	printk(KERN_INFO "my_hrtimer_callback\n");
-	
-	/* Reconfigure le timer (periode = 1 secondes) */
-	interval = ktime_set(PERIODE_TIMER_SEC, PERIODE_TIMER_NS);
-	hrtimer_start( &priv_s->hr_timer, interval, HRTIMER_MODE_REL );
-	
-	return HRTIMER_RESTART;
+	/* Récupère la prochaine valeur à afficher */
+	if ( (rc = kfifo_out(&priv->Kfifo, &val, SIZE_INT_IN_BYTE)) < 0) {
+		pr_err("Error kfifo_out (err=%d)\n",rc);
+        return rc;
+    /* Si elle est vide */
+	} else if (rc == 0) {
+		printk(KERN_DEBUG "Finish val \n");
+		
+		 /* Transforme en string la valeur à afficher */
+		sprintf(val_str, "%06x", priv->nbKey3Pressed);
+		/* Affiche les caractères sur les 7 seg*/
+		display_Seg0_3(priv->SEG0_3_ptr, val_str[2],val_str[3],val_str[4],val_str[5]);
+		display_Seg4_5(priv->SEG4_5_ptr, val_str[0],val_str[1]);
+		/* Indique qu'on a fini */
+		priv->active= 0;
+		
+		/* Si des valeurs attendaient, remplie la kfifo */
+		queue_work(priv->work_queue, &priv->modifie_kfifo);
+		
+		
+		return HRTIMER_NORESTART;
+	/* S'il y a encore des valeurs */
+	}else {
+		 /* Transforme en string la valeur à afficher */
+		sprintf(val_str, "%06x", val);
+		/* Affiche les caractères sur les 7 seg*/
+		display_Seg0_3(priv->SEG0_3_ptr, val_str[2],val_str[3],val_str[4],val_str[5]);
+		display_Seg4_5(priv->SEG4_5_ptr, val_str[0],val_str[1]);
+		
+		
+		/* Reconfigure le timer (periode = 0.5 secondes) */
+		hrtimer_start( &priv->hr_timer, priv->interval, HRTIMER_MODE_REL );
+		priv->active= 2;
+		
+		return HRTIMER_RESTART;
+	}
+	return -1;
 }
 
-
+/* Permet de paratger la structure privé */
 static int SIZE_open(struct inode* node, struct file * f)
 {
 	/* Récupération des informations du module (structure privée) */
     struct priv *priv_s ;
-    priv_s = container_of(node->i_cdev, struct priv, my_cdev);
+    priv_s = container_of(node->i_cdev, struct priv, my_cdev_read);
     /* Placement de la structure privée dans les data du fichier */
     f->private_data = priv_s;
     
@@ -105,23 +211,46 @@ static int SIZE_open(struct inode* node, struct file * f)
 
 
 
-/* */
+/* Lecture des différentes tailles de la kfifo */
 static ssize_t
 SIZE_read(struct file *filp, char __user *buf,
             size_t count, loff_t *ppos)
 {
-    struct priv *priv_s ;
+	char size_str[4] = "";
+	char all_size_str[4*MAX_VALUE_SIZE_DIFF] = "";
+    struct priv *priv ;
+    struct size_list *size_lu;
+    
 	
 	/* Récupération des informations du module (structure privée) */
-	priv_s = (struct priv *) filp->private_data;
+	priv = (struct priv *) filp->private_data;
+	
+	/* Si le programme est en reset */
+	if (priv->inReset == 1){
+		return 0;
+	}
 	
 	/* Si on vient de lire la valeur */
 	if (*ppos > 0) {
 		*ppos = 0;
         return 0;
     }
-	printk(KERN_ERR "SIZE_read\n");
-	
+    /* Get chaque noeud dans la liste */
+    list_for_each_entry( size_lu, &priv->size_list1, full_list ) {
+		/* Transforme en string la valeur lue */
+		sprintf(size_str, "%02d ", size_lu->size);
+		/* Concate toutes les valeurs */
+		strcat(all_size_str, size_str);	
+		/* Met à jour la pos */
+		*ppos += sizeof(size_str);
+	}
+    
+	/* Ecris dans le buffer user space toutes les valeurs lues */
+	if ( copy_to_user(buf, all_size_str, sizeof(all_size_str)) != 0 ) {
+		return 0;
+	}
+		
+			
     return *ppos;
 }
 
@@ -142,41 +271,113 @@ static int FIFO_open(struct inode* node, struct file * f)
 
 
 
-/* */
+/* Lecture des valeurs dans la kfifo */
 static ssize_t
 FIFO_read(struct file *filp, char __user *buf,
             size_t count, loff_t *ppos)
-{
-    struct priv *priv_s ;
+{	
+	int i,rc,taille;
+    struct priv *priv ;
+    int val_read[SIZE_INT_MAX_KFIFO];
+    char val_str[10] = "";
+    char all_val_str[10*SIZE_INT_MAX_KFIFO] = "";
 	
 	/* Récupération des informations du module (structure privée) */
-	priv_s = (struct priv *) filp->private_data;
+	priv = (struct priv *) filp->private_data;
+	
+	/* Si le programme est en reset */
+    if (priv->inReset == 1){
+		return 0;
+	}
 	
 	/* Si on vient de lire la valeur */
 	if (*ppos > 0) {
 		*ppos = 0;
         return 0;
     }
-	printk(KERN_ERR "FIFO_read\n");
+    
+	
+	/* Récupère les différents nombre dans la kfifo*/
+	taille = kfifo_len(&priv->Kfifo) / sizeof(int);
+	if ( (rc = kfifo_out_peek(&priv->Kfifo, val_read, SIZE_INT_MAX_KFIFO*SIZE_INT_IN_BYTE)) < 0) {
+        pr_err("Error kfifo_out_peek (err=%d)\n",rc);
+        return rc;
+	}
+	
+	/* Affiche les valeurs lues */
+	for (i=0; i < taille; ++i){
+		 /* Transforme en string la valeur lue */
+		sprintf(val_str, "0x%x ", val_read[i]);
+		/* Concate toutes les valeurs */
+		strcat(all_val_str, val_str);	
+		/* Met à jour la pos */
+		*ppos += sizeof(val_str);
+	}
+	
+	/* Ecris dans le buffer user space toutes les valeurs lues */
+	if ( copy_to_user(buf, all_val_str, sizeof(all_val_str)) != 0 ) {
+		return 0;
+	}
 	
     return *ppos;
 }
 
-/*  */
+/* Ecriture d'une nouvelle valeur dans la kfifo */
 static ssize_t
 FIFO_write(struct file *filp, const char __user *buf,
              size_t count, loff_t *ppos)
 {
-	struct priv *priv_s ;
+	int rc;
+	unsigned long long get_val;
+	unsigned int new_val;
+	
+	struct priv *priv ;
+	
 	/* Récupération des informations du module (structure privée) */
-	priv_s = (struct priv *) filp->private_data;
+	priv = (struct priv *) filp->private_data;
+	
+	/* Si le programme est en reset */
+    if (priv->inReset == 1){
+		return count;
+	}
 	
 	// Test les entrées
     if (count == 0) {
 		pr_err("Empty write requested!\n");
         return 0;
+    } 
+    
+    
+    /* Récupère la nouvelle valeur */
+    if ( (rc = kstrtoull_from_user(buf, count, HEXA_BASE, &get_val)) ) {
+		rc = -rc;
+        pr_err("Error kstrtoull_from_user (err=%d)\n",rc);
+        return rc;
     }
-	printk(KERN_ERR "FIFO_write\n");
+	/* Si la valeur est plus grande que la valeur max */
+	if (get_val > VALUE_MAX){
+		pr_err("Error new value to insert is too big (max = 0x%x)\n", HEXA_BASE);
+        return count;
+	}
+	
+	new_val = (int)get_val;
+	
+	/* Si la kfifo est déjà pleine ou qu'on affiche les valeurs */
+	if ( ((kfifo_len(&priv->Kfifo)/SIZE_INT_IN_BYTE) >= priv->size_kfifo) || priv->active == 2 ){
+		printk(KERN_DEBUG "KFIFO full ! \n");
+		/* Place la valeur dans la kfifo d'attente */
+		if ( (rc = kfifo_in(&priv->Kfifo_wait, &new_val, SIZE_INT_IN_BYTE)) <= 0 ) {
+			rc = -rc;
+			pr_err("Error kfifo_in (err=%d)\n",rc);
+			return rc;
+		}
+		
+	/* Sinon ajout la valeur dans la kfifo */	
+	} else if ( (rc = kfifo_in(&priv->Kfifo, &new_val, SIZE_INT_IN_BYTE)) <= 0 ) {
+		rc = -rc;
+        pr_err("Error kfifo_in (err=%d)\n",rc);
+        return rc;
+    }
 	
     return count;
 }
@@ -189,10 +390,11 @@ FIFO_write(struct file *filp, const char __user *buf,
 /* Fonction de handler appelée lors d'une interruption */
 irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {	
-	int valTailleKfifo;
-	
+	/* Structure contenant une eventuel prochaine taille */
+    struct size_list *another_size;
 	/* Récupération des informations du module préparées dans le fonction probe (request_irq) */
     struct priv *priv = (struct priv *) dev_id;
+    
     
     /* Récupère quel bouton a été pressé */
     unsigned int valKey = *(priv->KEY_ptr + CLEAR_INT);
@@ -201,17 +403,33 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 		lecture des numéros qui se trouvent dans la FIFO ou 
 		* compte le NB de pression */
 		
+		/* Si le timer est déjà actif */
+		if (priv->active) {
+			priv->nbKey3Pressed++;
+		} else {
+			/* Lance le timer */
+			priv->nbKey3Pressed = 0;
+			priv->active = 1;
+			hrtimer_start( &priv->hr_timer, priv->interval, HRTIMER_MODE_REL );
+		}
 		
-		printk(KERN_ERR "KEY3\n");
+		
 		/* Clear l'interruption du bouton */
 		*(priv->KEY_ptr + CLEAR_INT) = KEY3;
 	} else if (valKey == KEY0) { /* -----Pression sur le bouton KEY0  
 		Changement de la taille de la kfifo */
-		
+
 		/* Lecture de la valeur des switches ( SW0 - SW5 ) */
-		valTailleKfifo = ( *(priv->SW_ptr) & 0x3F ) + 1;
+		/* Met à jour la taille de la kfifo */
+		priv->size_kfifo = (( *(priv->SW_ptr) & 0x3F ) + 1 ) ;
+		printk(KERN_DEBUG "New size : %d\n", priv->size_kfifo );
 		
-		printk(KERN_ERR "KEY0 sw : %d\n", valTailleKfifo );
+		/* Ajoute la new taille dans la liste */
+		another_size = (struct size_list *) kmalloc( sizeof(struct size_list), GFP_KERNEL );
+		another_size->size = priv->size_kfifo;
+		list_add(&another_size->full_list, &priv->size_list1);
+		/* Lance la fonction pour la mise à jour de la kfifo */
+		queue_work(priv->work_queue, &priv->modifie_kfifo);
 		
 		/* Clear l'interruption du bouton */
 		*(priv->KEY_ptr + CLEAR_INT) = KEY0;
@@ -219,19 +437,25 @@ irq_handler_t irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 	} else if (valKey == KEY1) { /* -------------------Pression sur KEY1  
 		reset globale */
 		
+		/* Lance la fonction pour le reset global */
+		queue_work(priv->work_queue, &priv->reset);
 		
-		printk(KERN_ERR "KEY1\n");
 		/* Clear l'interruption du bouton */
 		*(priv->KEY_ptr + CLEAR_INT) = KEY1;
 	} else if (valKey == KEY2) { /* -------------------Pression sur KEY2 
 		L’affichage est interrompu */
 		
+		/* Stop le timer */
+		priv->active= 0;
+		hrtimer_cancel(&priv->hr_timer);
 		
-		printk(KERN_ERR "KEY2\n");
+		/* Si des valeurs sont en attentes, remplis la kfifo principale */
+		queue_work(priv->work_queue, &priv->modifie_kfifo);
+		
 		/* Clear l'interruption du bouton */
 		*(priv->KEY_ptr + CLEAR_INT) = KEY2;
 	} else { 
-		printk(KERN_ERR "Autre\n");
+		printk(KERN_ERR "Autre boutons... !?\n");
 		/* Clear les autres interruptions */
 		*(priv->KEY_ptr + CLEAR_INT) = 0xFFFFFFFF;
 	}
@@ -247,8 +471,8 @@ static int Aff_FIFO_probe(struct platform_device *pdev)
     struct priv *priv;
 	/* Valeur de retour */
     int rc;
-    int valTailleKfifo;
-    ktime_t ktime;
+    /* Structure contenant la première taille */
+    struct size_list *first_size;
     
     
 	/* Allocation mémoire kernel pour la structure priv (informations du module)*/
@@ -308,9 +532,6 @@ static int Aff_FIFO_probe(struct platform_device *pdev)
     /* Met à jour l'adresse des switches via l'adresse mappée du module*/
     priv->SW_ptr = priv->MEM_ptr + SW_BASE;
     
-    /* Init de la taille de la kfifo ( SW0 - SW5 ) */
-	valTailleKfifo = ( *(priv->SW_ptr) & 0x3F ) + 1;
-	printk(KERN_INFO "KEY0 sw : %d\n", valTailleKfifo ); 
 		
 		
 	/*--------------ENREGISTREMENT DE L'INTERRUPTION------------------*/
@@ -390,31 +611,88 @@ static int Aff_FIFO_probe(struct platform_device *pdev)
 	if(IS_ERR(device_create(priv->my_cdev_class, NULL, priv->dev_fifo, NULL, NODE_FIFO_NAME))){
 		pr_err("Error device_create\n");
 		rc = -1;
-		goto device_create_fail;
+		goto device_create_fail1;
 	}
 	if(IS_ERR(device_create(priv->my_cdev_class, NULL, priv->dev_read_size, NULL, NODE_READ_SIZE_NAME))){
 		pr_err("Error device_create\n");
 		rc = -1;
-		goto device_create_fail;
+		goto device_create_fail2;
 	}
 	
-     /*------------------ENREGISTREMENT DU TIMER----------------------*/
-
-	/* Initilisation du timer (periode = 0.5 secondes) */
-	ktime = ktime_set(PERIODE_TIMER_SEC, PERIODE_TIMER_NS);
-	hrtimer_init( &priv->hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL );
-	priv->hr_timer.function = &my_hrtimer_callback;
-	hrtimer_start( &priv->hr_timer, ktime, HRTIMER_MODE_REL );
-	priv->my_chrono.active = 1;
+     
  
     
+    /*----------------------------KFIFO-------------------------------*/
+    
+    if ((rc = kfifo_alloc(&priv->Kfifo,
+                          SIZE_INT_MAX_KFIFO * SIZE_INT_IN_BYTE, 
+                          GFP_KERNEL)) != 0) {
+        pr_err("Cannot allocate main KFIFO (error: %d)\n", rc);
+        rc = -ENOMEM;
+        goto cleanup_data_in_kfifo1;
+    }
+     /* Init de la taille de la kfifo ( SW0 - SW5 ) */
+    priv->size_kfifo = (( *(priv->SW_ptr) & 0x3F ) + 1 );
+	printk(KERN_INFO "Size kfifo = %d\n", priv->size_kfifo ); 
+	
+	/* Kfifo d'attente */
+	if ((rc = kfifo_alloc(&priv->Kfifo_wait,
+                          SIZE_INT_MAX_KFIFO * SIZE_INT_IN_BYTE, 
+                          GFP_KERNEL)) != 0) {
+        pr_err("Cannot allocate main KFIFO (error: %d)\n", rc);
+        rc = -ENOMEM;
+        goto cleanup_data_in_kfifo2;
+    }
+    
+    
+    
+    /*------------------ENREGISTREMENT DE LA LISTE--------------------*/
+
+    INIT_LIST_HEAD(&priv->size_list1);
+    first_size = (struct size_list *) kmalloc(sizeof(*first_size), GFP_KERNEL );
+    if ( first_size == NULL) {
+		pr_err("Failed to kmalloc size object \n");
+        rc = -ENOMEM;
+        goto kmalloc_size_fail;
+	}
+    first_size->size = priv->size_kfifo;
+    list_add(&first_size->full_list, &priv->size_list1);
+    
+    
+    /*------------------ENREGISTREMENT DU TIMER----------------------*/
+
+	/* Initilisation du timer (periode = 0.5 secondes) */
+	priv->interval = ktime_set(PERIODE_TIMER_SEC, PERIODE_TIMER_NS);
+	hrtimer_init( &priv->hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL );
+	priv->hr_timer.function = &my_hrtimer_callback;
+	priv->active= 0;
+	
+	
+	
+	 /*------------------ENREGISTREMENT WORKQUEUE---------------------*/
+	priv->work_queue = create_workqueue(NAME_WORK_QUEUE);
+	BUG_ON(!priv->work_queue);
+
+    INIT_WORK(&priv->modifie_kfifo, wq_fn_modif_kfifo);
+    INIT_WORK(&priv->reset, wq_fn_reset);
+	 
+	 
     
     printk(KERN_INFO "Driver ready!\n");
 	/* Retourne 0 si la fonction probe c'est correctement effectué */
     return 0;
 
 /* Déclaration de labels afin de gérer toutes les erreurs possibles de la fonction probe ci-dessus */
- device_create_fail:
+ kmalloc_size_fail:
+	Cleaning_list(priv);
+    kfifo_free(&priv->Kfifo_wait);
+ cleanup_data_in_kfifo2:
+    kfifo_free(&priv->Kfifo);
+ cleanup_data_in_kfifo1:
+	device_destroy(priv->my_cdev_class, priv->dev_fifo);
+ device_create_fail2:
+    device_destroy(priv->my_cdev_class, priv->dev_read_size);
+ device_create_fail1:
 	class_destroy(priv->my_cdev_class);
  my_cdev_class_fail:
 	cdev_del(&priv->my_cdev);
@@ -430,19 +708,42 @@ static int Aff_FIFO_probe(struct platform_device *pdev)
     return rc;
 }
 
+void Cleaning_list(struct priv* priv){
+	
+	struct list_head *pos, *q;
+	struct size_list *tmp;
+	
+	/* Free la liste */
+	list_for_each_safe( pos, q, &priv->size_list1 ) {
+		tmp = list_entry( pos, struct size_list, full_list );
+		list_del( pos );
+		kfree( tmp );
+	}
+	
+}
+
 /* Fonction remove appelée lors du débranchement du périphérique (pdev est un poiteur sur une structure contenant toutes les informations du device retiré) */
 static int Aff_FIFO_remove(struct platform_device *pdev)
-{	
+{
 	int rc;
-    
-    /* Récupère l'adresse de la structure priv correspondant au platform_device reçu (précèdemment lié dans la fonction probe)*/
-    struct priv *priv = platform_get_drvdata(pdev);
 
-    printk(KERN_INFO "Removing driver...\n");
+	/* Récupère l'adresse de la structure priv correspondant au platform_device reçu (précèdemment lié dans la fonction probe)*/
+    struct priv *priv = platform_get_drvdata(pdev);
+    
+    /* Supprime la workqueue */
+    flush_workqueue(priv->work_queue);
+    destroy_workqueue(priv->work_queue);
     
     /* Supprime le timer */
     rc = hrtimer_cancel( &priv->hr_timer );
 	if (rc) pr_err("The timer was still in use...\n");
+	
+	/* Free la liste */
+	Cleaning_list(priv);
+	
+	/* Free the KFIFOs */
+    kfifo_free(&priv->Kfifo_wait);
+    kfifo_free(&priv->Kfifo);
 	
 	
 	/* ANNULE L'ENREGISTREMENT DES CARACTERES DEVICE */
@@ -471,3 +772,19 @@ static int Aff_FIFO_remove(struct platform_device *pdev)
 
 
 
+/* Permet d'afficher 4 chiffres sur les 4 premiers 7 seg */
+void display_Seg0_3(volatile int * ioctrl,
+                  char num4, char num3, char num2, char num1)
+{
+	*ioctrl = 0x0 | hex_digits[char_to_int(num4)] << 24 | 
+					hex_digits[char_to_int(num3) ] << 16 | 
+					hex_digits[char_to_int(num2)] << 8 | 
+					hex_digits[char_to_int(num1)];
+}
+/* Permet d'afficher 2 chiffre sur les 2 derniers 7 seg */
+void display_Seg4_5(volatile int * ioctrl,
+                   char num6, char num5)
+{
+    *ioctrl = 0x0 | hex_digits[char_to_int(num6)] << 8 | 
+					hex_digits[char_to_int(num5)];
+}

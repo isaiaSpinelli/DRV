@@ -34,10 +34,23 @@ sudo cp Aff_num.ko /export/drv/Labo6/
 tar -czvf file.tar.gz directory
 
 insmod 
-rmmod 
+rmmod Aff_num
 
 dmesg | tail
 sudo mknod /dev/nodeCompte c 100 0
 sudo chmod 666 /dev/nodeCompte
 cat /dev/
 echo "" > /dev/
+
+
+echo 0 > /dev/fifo
+echo 1 > /dev/fifo
+echo 2 > /dev/fifo
+echo 3 > /dev/fifo
+echo 4 > /dev/fifo
+echo 5 > /dev/fifo
+echo 6 > /dev/fifo
+echo 7 > /dev/fifo
+echo 8 > /dev/fifo
+echo 9 > /dev/fifo
+echo 10 > /dev/fifo
